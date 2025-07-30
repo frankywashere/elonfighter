@@ -963,6 +963,9 @@
                 
                 // Can't act during hitstun/blockstun
                 if (this.hitstunFrames > 0 || this.blockstunFrames > 0 || this.knockdownFrames > 0) {
+                    if (this.isPlayer && this.blockstunFrames > 0) {
+                        console.log('[PLAYER] In blockstun, cannot act:', this.blockstunFrames);
+                    }
                     return;
                 }
                 
@@ -1006,18 +1009,30 @@
                 // This allows walking backwards when far away with no threats
                 this.blocking = holdingBack && !this.isDizzy && (inBlockRange || hasActiveThreat);
                 
-                // Debug logging for player
-                if (this.isPlayer && (this.blocking || holdingBack)) {
-                    console.log('[PLAYER] handleInput blocking check:', {
+                // Debug logging for player - log every frame to catch the stuck state
+                if (this.isPlayer) {
+                    const debugInfo = {
                         blocking: this.blocking,
                         holdingBack: holdingBack,
+                        backKey: backKey,
+                        keys_a: keys['a'],
+                        keys_d: keys['d'],
+                        facing: this.facing,
                         inBlockRange: inBlockRange,
                         distance: distance,
                         hasActiveThreat: hasActiveThreat,
                         opponentHasActiveHitbox: opponentHasActiveHitbox,
                         hasIncomingProjectile: hasIncomingProjectile,
-                        state: this.state
-                    });
+                        state: this.state,
+                        hitstun: this.hitstunFrames,
+                        blockstun: this.blockstunFrames,
+                        isDizzy: this.isDizzy
+                    };
+                    
+                    // Only log when something interesting is happening
+                    if (holdingBack || this.blocking || this.state === 'walk' || this.blockstunFrames > 0) {
+                        console.log('[PLAYER] Frame state:', debugInfo);
+                    }
                 }
                 
                 // Visual feedback for blocking type
@@ -1145,7 +1160,11 @@
                 // Don't walk if blocking
                 if (this.blocking) {
                     if (this.isPlayer) {
-                        console.log('[PLAYER] Walk prevented by blocking');
+                        console.log('[PLAYER] Walk prevented by blocking', {
+                            blocking: this.blocking,
+                            direction: direction,
+                            facing: this.facing
+                        });
                     }
                     return;
                 }
@@ -1155,6 +1174,13 @@
                     this.velocityX = direction * speed;
                     this.state = 'walk';
                     
+                    if (this.isPlayer) {
+                        console.log('[PLAYER] Walking', {
+                            direction: direction,
+                            facing: this.facing,
+                            walkingBackward: direction !== this.facing
+                        });
+                    }
                 }
             }
 
