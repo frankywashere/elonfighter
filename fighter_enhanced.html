@@ -281,6 +281,10 @@
                 // Hitboxes
                 this.hurtboxes = [];
                 this.hitboxes = [];
+                
+                // Multi-hit tracking
+                this.currentMoveHits = 0;
+                this.lastHit = null;
             }
 
             drawCharacterSprite(isAfterImage = false) {
@@ -987,24 +991,9 @@
                 // Also check if we're holding down for low blocking
                 const holdingDown = keys['s'];
                 
-                // Check if opponent has active hitboxes - more direct approach
-                let opponentHasActiveHitbox = opponent.hitboxes.length > 0;
-                
-                // Check for incoming projectiles
-                const hasIncomingProjectile = opponent.projectiles.some(proj => {
-                    const projDistance = Math.abs(proj.x - this.x);
-                    const projComingToward = (proj.facing === 1 && proj.x < this.x) || 
-                                           (proj.facing === -1 && proj.x > this.x);
-                    return projComingToward && projDistance < 300;
-                });
-                
-                // Block if holding back AND there's an active threat
-                const distance = Math.abs(this.x - opponent.x);
-                const shouldBlock = holdingBack && !this.isDizzy && 
-                                  ((opponentHasActiveHitbox && distance < 200) || hasIncomingProjectile);
-                
-                // Set blocking state and type
-                this.blocking = shouldBlock;
+                // In Street Fighter, you can block at any time by holding back
+                // The block check happens when you actually get hit, not before
+                this.blocking = holdingBack && !this.isDizzy && this.state !== 'attack';
                 
                 // Visual feedback for blocking type
                 if (this.blocking) {
@@ -1126,6 +1115,7 @@
                 this.state = 'attack';
                 this.currentMove = move;
                 this.moveFrame = 0;
+                this.currentMoveHits = 0;  // Reset hit counter for new move
                 
                 // Special properties
                 if (move === 'shoryuken') {
@@ -1393,8 +1383,6 @@
                 // Check blocking at the moment of impact
                 const isLowAttack = attacker?.currentMove && FRAME_DATA[attacker.currentMove]?.low;
                 
-                // Debug info
-                console.log(`Taking damage - Blocking: ${this.blocking}, Crouching: ${this.crouching}, Attack: ${attacker?.currentMove}, IsLow: ${isLowAttack}`);
                 
                 // Blocking logic:
                 // - Crouch block blocks EVERYTHING
@@ -1756,7 +1744,7 @@
             // Special moves - REDUCED DAMAGE
             hadouken: { startup: 13, active: 40, recovery: 40, damage: 5, hitstun: 20, blockstun: 16, pushback: 3, projectile: true },
             shoryuken: { startup: 3, active: 14, recovery: 43, damage: 8, hitstun: 30, blockstun: 0, pushback: 5, invincible: 8, knockdown: true },
-            tatsumaki: { startup: 11, active: 24, recovery: 18, damage: 3, hitstun: 18, blockstun: 16, pushback: 4, hits: 3 },
+            tatsumaki: { startup: 11, active: 24, recovery: 18, damage: 2, hitstun: 18, blockstun: 16, pushback: 4, hits: 3 },
             
             // Throw
             throw: { startup: 3, active: 2, recovery: 24, damage: 12, range: THROW_RANGE }
@@ -2011,6 +1999,23 @@
                             if (attacker.lastHit !== attacker.currentMove + attacker.moveFrame) {
                                 const moveData = FRAME_DATA[attacker.currentMove];
                                 
+                                // Check if we've reached the hit limit for multi-hit moves
+                                const maxHits = moveData.hits || 1;
+                                if (attacker.currentMoveHits >= maxHits) {
+                                    continue;  // Skip this hit if we've reached the limit
+                                }
+                                
+                                // For multi-hit moves, space out the hits
+                                if (maxHits > 1) {
+                                    const framesPerHit = Math.floor(moveData.active / maxHits);
+                                    const currentHitFrame = attacker.moveFrame - moveData.startup;
+                                    const expectedHitFrame = attacker.currentMoveHits * framesPerHit;
+                                    
+                                    if (currentHitFrame < expectedHitFrame) {
+                                        continue;  // Too early for the next hit
+                                    }
+                                }
+                                
                                 if (hitbox.type === 'throw' && defender.throwTechWindow <= 0) {
                                     // Successful throw
                                     defender.beingThrown = true;
@@ -2031,6 +2036,7 @@
                                 }
                                 
                                 attacker.lastHit = attacker.currentMove + attacker.moveFrame;
+                                attacker.currentMoveHits++;  // Increment hit counter
                                 
                                 // Build super meter
                                 attacker.superMeter = Math.min(attacker.maxSuper, 
