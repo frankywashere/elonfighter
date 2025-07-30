@@ -336,12 +336,38 @@
                 
                 // Check if opponent is attacking or has projectiles
                 const opponent = this.isPlayer ? aiPlayer : player;
-                const opponentAttacking = opponent.state === 'attack' || opponent.projectiles.length > 0;
-                const distance = Math.abs(this.x - opponent.x);
                 
-                // Blocking - only when holding back AND opponent is attacking nearby
+                // Determine if we should block based on:
+                // 1. Opponent has active hitboxes (actually in attack frames)
+                // 2. Opponent has projectiles coming our way
+                // 3. We're holding the back direction
                 const backKey = this.facing === 1 ? 'a' : 'd';
-                this.blocking = keys[backKey] && !this.isDizzy && opponentAttacking && distance < 200;
+                const holdingBack = keys[backKey];
+                
+                // Check if opponent has active hitboxes
+                let opponentHasActiveHitbox = false;
+                if (opponent.state === 'attack' && opponent.currentMove) {
+                    const frameData = FRAME_DATA[opponent.currentMove];
+                    if (frameData && opponent.moveFrame >= frameData.startup && 
+                        opponent.moveFrame < frameData.startup + frameData.active) {
+                        opponentHasActiveHitbox = true;
+                    }
+                }
+                
+                // Check for incoming projectiles
+                const hasIncomingProjectile = opponent.projectiles.some(proj => {
+                    const projDistance = Math.abs(proj.x - this.x);
+                    const projComingToward = (proj.facing === 1 && proj.x < this.x) || 
+                                           (proj.facing === -1 && proj.x > this.x);
+                    return projComingToward && projDistance < 300;
+                });
+                
+                // Block if holding back AND there's an active threat
+                const distance = Math.abs(this.x - opponent.x);
+                const shouldBlock = holdingBack && !this.isDizzy && 
+                                  (opponentHasActiveHitbox && distance < 150 || hasIncomingProjectile);
+                
+                this.blocking = shouldBlock;
                 
                 // Movement
                 if (this.state !== 'attack') {

@@ -966,6 +966,72 @@
                     return;
                 }
                 
+                // Update facing FIRST (for cross-ups)
+                const opponent = this.isPlayer ? aiPlayer : player;
+                if (opponent && this.state !== 'attack' && !this.knockdownFrames) {
+                    const oldFacing = this.facing;
+                    this.facing = this.x < opponent.x ? 1 : -1;
+                    
+                    // If facing changed (cross-up), immediately update blocking
+                    if (oldFacing !== this.facing) {
+                        this.blocking = false; // Reset blocking on cross-up
+                    }
+                }
+                
+                // Check blocking state BEFORE any attacks
+                const backKey = this.facing === 1 ? 'a' : 'd';
+                const holdingBack = keys[backKey];
+                const holdingDown = keys['s'];
+                
+                // Check if opponent has active hitboxes
+                let opponentHasActiveHitbox = opponent.hitboxes.length > 0;
+                
+                // Check for incoming projectiles
+                const hasIncomingProjectile = opponent.projectiles.some(proj => {
+                    const projDistance = Math.abs(proj.x - this.x);
+                    const projComingToward = (proj.facing === 1 && proj.x < this.x) || 
+                                           (proj.facing === -1 && proj.x > this.x);
+                    return projComingToward && projDistance < 300;
+                });
+                
+                // Block if holding back AND there's an active threat
+                const distance = Math.abs(this.x - opponent.x);
+                const shouldBlock = holdingBack && !this.isDizzy && 
+                                  ((opponentHasActiveHitbox && distance < 200) || hasIncomingProjectile);
+                
+                // Set blocking state
+                this.blocking = shouldBlock;
+                
+                // Debug logging for player
+                if (this.isPlayer && shouldBlock) {
+                    console.log('[PLAYER] Blocking state:', {
+                        holdingBack: holdingBack,
+                        opponentHasActiveHitbox: opponentHasActiveHitbox,
+                        distance: distance,
+                        hasIncomingProjectile: hasIncomingProjectile
+                    });
+                }
+                
+                // Visual feedback for blocking type
+                if (this.blocking) {
+                    this.blockType = holdingDown ? 'low' : 'high';
+                } else {
+                    this.blockType = null;
+                }
+                
+                // If blocking, don't allow attacks
+                if (this.blocking) {
+                    // Still allow movement while blocking
+                    if (this.state !== 'attack') {
+                        if (keys['s']) {
+                            this.crouch();
+                        } else {
+                            this.crouching = false;
+                        }
+                    }
+                    return;
+                }
+                
                 // Check for throw
                 if (keys['i'] && keys['k'] && this.state !== 'attack' && this.grounded) {
                     this.attemptThrow();
@@ -991,54 +1057,6 @@
                         this.performSpecialMove('tatsumaki');
                         return;
                     }
-                }
-                
-                // Update facing BEFORE checking block direction (for cross-ups)
-                const opponent = this.isPlayer ? aiPlayer : player;
-                if (opponent && this.state !== 'attack' && !this.knockdownFrames) {
-                    const oldFacing = this.facing;
-                    this.facing = this.x < opponent.x ? 1 : -1;
-                    
-                    // If facing changed (cross-up), immediately update blocking
-                    if (oldFacing !== this.facing) {
-                        this.blocking = false; // Reset blocking on cross-up
-                    }
-                }
-                
-                // Determine if we should block based on:
-                // 1. Opponent has active hitboxes (actually in attack frames)
-                // 2. Opponent has projectiles coming our way
-                // 3. We're holding the CURRENT back direction (after facing update)
-                const backKey = this.facing === 1 ? 'a' : 'd';
-                const holdingBack = keys[backKey];
-                
-                // Also check if we're holding down for low blocking
-                const holdingDown = keys['s'];
-                
-                // Check if opponent has active hitboxes - more direct approach
-                let opponentHasActiveHitbox = opponent.hitboxes.length > 0;
-                
-                // Check for incoming projectiles
-                const hasIncomingProjectile = opponent.projectiles.some(proj => {
-                    const projDistance = Math.abs(proj.x - this.x);
-                    const projComingToward = (proj.facing === 1 && proj.x < this.x) || 
-                                           (proj.facing === -1 && proj.x > this.x);
-                    return projComingToward && projDistance < 300;
-                });
-                
-                // Block if holding back AND there's an active threat
-                const distance = Math.abs(this.x - opponent.x);
-                const shouldBlock = holdingBack && !this.isDizzy && 
-                                  ((opponentHasActiveHitbox && distance < 200) || hasIncomingProjectile);
-                
-                // Set blocking state and type
-                this.blocking = shouldBlock;
-                
-                // Visual feedback for blocking type
-                if (this.blocking) {
-                    this.blockType = holdingDown ? 'low' : 'high';
-                } else {
-                    this.blockType = null;
                 }
                 
                 
@@ -1146,6 +1164,7 @@
                 this.moveFrame = 0;
                 this.currentMoveHits = 0;  // Reset hit counter
                 this.lastHitFrame = -999;  // Reset last hit frame
+                this.blocking = false;  // Clear blocking when attacking
                 this.inputBuffer.addButton(button);
             }
 
@@ -1160,6 +1179,7 @@
                 this.moveFrame = 0;
                 this.currentMoveHits = 0;  // Reset hit counter
                 this.lastHitFrame = -999;  // Reset last hit frame
+                this.blocking = false;  // Clear blocking when attacking
                 
                 // Special properties
                 if (move === 'shoryuken') {
@@ -1185,6 +1205,7 @@
                     this.state = 'attack';
                     this.currentMove = 'throw';
                     this.moveFrame = 0;
+                    this.blocking = false;  // Clear blocking when attacking
                     this.isThrowAttempt = true;
                     
                     // Give opponent tech window
@@ -1427,6 +1448,16 @@
                 // Check blocking at the moment of impact
                 const isLowAttack = FRAME_DATA[attacker?.currentMove]?.low;
                 
+                // Debug logging
+                console.log(`[${this.isPlayer ? 'PLAYER' : 'CPU'}] Taking damage:`, {
+                    attack: attacker?.currentMove,
+                    damage: damage,
+                    blocking: this.blocking,
+                    crouching: this.crouching,
+                    grounded: this.grounded,
+                    isLowAttack: isLowAttack
+                });
+                
                 // Blocking logic:
                 // - Crouch block blocks EVERYTHING
                 // - Stand block blocks everything EXCEPT low attacks
@@ -1445,6 +1476,8 @@
                         blocked = true;
                     }
                 }
+                
+                console.log(`[${this.isPlayer ? 'PLAYER' : 'CPU'}] Block result:`, blocked);
                 
                 // Failed to block low attack while standing
                 if (this.blocking && this.grounded && !this.crouching && isLowAttack) {

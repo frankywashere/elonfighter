@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Canvas Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #333;
+        }
+        canvas {
+            border: 2px solid white;
+            display: block;
+        }
+        .info {
+            color: white;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="testCanvas"></canvas>
+    <div class="info">
+        If you see a blue rectangle above, the canvas is working.
+    </div>
+    
+    <script>
+        console.log('Test script starting...');
+        const canvas = document.getElementById('testCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        canvas.width = 400;
+        canvas.height = 300;
+        
+        // Clear to black
+        ctx.fillStyle = 'black';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Draw blue rectangle
+        ctx.fillStyle = 'blue';
+        ctx.fillRect(50, 50, 300, 200);
+        
+        // Draw text
+        ctx.fillStyle = 'white';
+        ctx.font = '20px Arial';
+        ctx.fillText('Canvas is working!', 100, 150);
+        
+        console.log('Test complete - canvas should show blue rectangle');
+    </script>
+</body>
+</html>
