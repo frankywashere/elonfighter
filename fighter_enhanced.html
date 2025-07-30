@@ -994,20 +994,24 @@
                     return projComingToward && projDistance < 300;
                 });
                 
-                // Block if holding back AND there's an active threat
+                // In Street Fighter, you're in blocking stance whenever you hold back
+                // The actual block only succeeds if there's an active threat when hit
                 const distance = Math.abs(this.x - opponent.x);
-                const shouldBlock = holdingBack && !this.isDizzy && 
-                                  ((opponentHasActiveHitbox && distance < 200) || hasIncomingProjectile);
+                this.blocking = holdingBack && !this.isDizzy;
                 
-                // Set blocking state
-                this.blocking = shouldBlock;
+                // Check if there's an active threat (for visual feedback or priority)
+                const hasActiveThreat = (opponentHasActiveHitbox && distance < 200) || hasIncomingProjectile;
                 
                 // Debug logging for player
-                if (this.isPlayer) {
+                if (this.isPlayer && (this.blocking || holdingBack)) {
                     console.log('[PLAYER] handleInput blocking check:', {
                         blocking: this.blocking,
-                        shouldBlock: shouldBlock,
                         holdingBack: holdingBack,
+                        backKey: backKey,
+                        keys_a: keys['a'],
+                        keys_d: keys['d'],
+                        facing: this.facing,
+                        hasActiveThreat: hasActiveThreat,
                         opponentHasActiveHitbox: opponentHasActiveHitbox,
                         distance: distance,
                         hasIncomingProjectile: hasIncomingProjectile,
@@ -1137,6 +1141,14 @@
             }
 
             walk(direction) {
+                // Don't walk if blocking
+                if (this.blocking) {
+                    if (this.isPlayer) {
+                        console.log('[PLAYER] Walk prevented by blocking');
+                    }
+                    return;
+                }
+                
                 if (this.grounded && !this.crouching) {
                     const speed = direction === this.facing ? WALK_SPEED_FORWARD : WALK_SPEED_BACKWARD;
                     this.velocityX = direction * speed;
