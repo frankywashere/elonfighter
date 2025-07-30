@@ -159,15 +159,6 @@
             transition: none;
         }
         
-        /* Jump Button */
-        .jump-button {
-            position: absolute;
-            left: 250px;
-            bottom: 80px;
-            width: 80px;
-            height: 80px;
-            font-size: 24px;
-        }
         
         /* Action Buttons */
         .action-buttons {
@@ -227,9 +218,6 @@
                 <div class="joystick-base"></div>
                 <div class="joystick-handle" id="joystickHandle"></div>
             </div>
-            
-            <!-- Separate Jump Button -->
-            <div class="touch-button jump-button" data-key="w">JUMP</div>
             
             <!-- Action Buttons -->
             <div class="action-buttons">
@@ -345,8 +333,7 @@
                     this.keys['a'] = deltaX < -threshold;
                     this.keys['d'] = deltaX > threshold;
                     this.keys['s'] = deltaY > threshold;
-                    
-                    // No up key for joystick - use jump button instead
+                    this.keys['w'] = deltaY < -threshold;  // Up for jump
                 };
                 
                 const resetJoystick = () => {
@@ -354,6 +341,7 @@
                     this.keys['a'] = false;
                     this.keys['d'] = false;
                     this.keys['s'] = false;
+                    this.keys['w'] = false;
                 };
                 
                 joystick.addEventListener('touchstart', (e) => {
