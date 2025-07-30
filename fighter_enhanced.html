@@ -59,13 +59,38 @@
             animation: pulse 0.3s ease-in-out;
         }
         
-        /* Mobile Controls */
+        /* Force landscape on mobile */
+        @media screen and (max-width: 768px) and (orientation: portrait) {
+            body::before {
+                content: "Please rotate your device to landscape mode";
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: #000;
+                color: #fff;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 9999;
+                font-size: 24px;
+                text-align: center;
+                padding: 20px;
+            }
+            
+            #gameContainer {
+                display: none;
+            }
+        }
+        
+        /* Mobile Controls - Overlay Style */
         .mobile-controls {
             position: fixed;
-            bottom: 0;
+            top: 0;
             left: 0;
             right: 0;
-            height: 200px;
+            bottom: 0;
             display: none;
             pointer-events: none;
             z-index: 1000;
@@ -77,12 +102,12 @@
         
         .touch-button {
             position: absolute;
-            background: rgba(255, 255, 255, 0.2);
-            border: 2px solid rgba(255, 255, 255, 0.5);
-            border-radius: 10px;
-            color: white;
+            background: rgba(255, 255, 255, 0.1);
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            color: rgba(255, 255, 255, 0.8);
             font-weight: bold;
-            font-size: 20px;
+            font-size: 18px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -90,100 +115,83 @@
             user-select: none;
             -webkit-user-select: none;
             touch-action: none;
+            transition: none;
         }
         
         .touch-button.active {
-            background: rgba(255, 255, 255, 0.4);
+            background: rgba(255, 255, 255, 0.3);
             border-color: rgba(255, 255, 255, 0.8);
-            transform: scale(0.95);
+            transform: scale(0.9);
         }
         
-        .dpad {
+        /* Virtual Joystick */
+        .virtual-joystick {
             position: absolute;
-            left: 20px;
-            bottom: 20px;
+            left: 60px;
+            bottom: 60px;
             width: 150px;
             height: 150px;
             pointer-events: auto;
         }
         
-        .dpad-button {
+        .joystick-base {
             position: absolute;
-            background: rgba(255, 255, 255, 0.2);
-            border: 2px solid rgba(255, 255, 255, 0.5);
+            width: 150px;
+            height: 150px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
             pointer-events: auto;
             touch-action: none;
         }
         
-        .dpad-button.active {
-            background: rgba(255, 255, 255, 0.4);
-            border-color: rgba(255, 255, 255, 0.8);
-        }
-        
-        .dpad-up {
-            top: 0;
-            left: 50px;
-            width: 50px;
-            height: 50px;
-            border-radius: 10px 10px 0 0;
-        }
-        
-        .dpad-down {
-            bottom: 0;
-            left: 50px;
-            width: 50px;
-            height: 50px;
-            border-radius: 0 0 10px 10px;
-        }
-        
-        .dpad-left {
-            left: 0;
-            top: 50px;
-            width: 50px;
-            height: 50px;
-            border-radius: 10px 0 0 10px;
-        }
-        
-        .dpad-right {
-            right: 0;
-            top: 50px;
-            width: 50px;
-            height: 50px;
-            border-radius: 0 10px 10px 0;
-        }
-        
-        .dpad-center {
-            top: 50px;
-            left: 50px;
-            width: 50px;
-            height: 50px;
-            background: rgba(0, 0, 0, 0.3);
-            border: none;
+        .joystick-handle {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            background: rgba(255, 255, 255, 0.3);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
             pointer-events: none;
+            transition: none;
         }
         
+        /* Jump Button */
+        .jump-button {
+            position: absolute;
+            left: 250px;
+            bottom: 80px;
+            width: 80px;
+            height: 80px;
+            font-size: 24px;
+        }
+        
+        /* Action Buttons */
         .action-buttons {
             position: absolute;
-            right: 20px;
-            bottom: 20px;
-            width: 200px;
-            height: 150px;
+            right: 60px;
+            bottom: 40px;
+            width: 280px;
+            height: 200px;
             pointer-events: none;
         }
         
         .action-button {
-            width: 55px;
-            height: 55px;
-            font-size: 16px;
+            width: 70px;
+            height: 70px;
+            font-size: 18px;
         }
         
-        /* 6-button layout like arcade */
-        .btn-lp { top: 20px; left: 0; }
-        .btn-mp { top: 20px; left: 70px; }
-        .btn-hp { top: 20px; left: 140px; }
-        .btn-lk { top: 85px; left: 0; }
-        .btn-mk { top: 85px; left: 70px; }
-        .btn-hk { top: 85px; left: 140px; }
+        /* 6-button layout optimized for mobile */
+        .btn-lp { top: 30px; right: 210px; }
+        .btn-mp { top: 0; right: 120px; }
+        .btn-hp { top: 0; right: 30px; }
+        .btn-lk { bottom: 30px; right: 210px; }
+        .btn-mk { bottom: 0; right: 120px; }
+        .btn-hk { bottom: 0; right: 30px; }
         
         @media (max-width: 768px) {
             .controls {
@@ -192,7 +200,7 @@
             
             #gameContainer {
                 width: 100vw;
-                height: calc(100vh - 200px);
+                height: 100vh;
             }
             
             canvas {
@@ -214,13 +222,16 @@
         
         <!-- Mobile Controls -->
         <div class="mobile-controls" id="mobileControls">
-            <div class="dpad">
-                <div class="dpad-button dpad-up" data-key="w"></div>
-                <div class="dpad-button dpad-down" data-key="s"></div>
-                <div class="dpad-button dpad-left" data-key="a"></div>
-                <div class="dpad-button dpad-right" data-key="d"></div>
-                <div class="dpad-center"></div>
+            <!-- Virtual Joystick for movement -->
+            <div class="virtual-joystick" id="virtualJoystick">
+                <div class="joystick-base"></div>
+                <div class="joystick-handle" id="joystickHandle"></div>
             </div>
+            
+            <!-- Separate Jump Button -->
+            <div class="touch-button jump-button" data-key="w">JUMP</div>
+            
+            <!-- Action Buttons -->
             <div class="action-buttons">
                 <div class="touch-button action-button btn-lp" data-key="u">LP</div>
                 <div class="touch-button action-button btn-mp" data-key="i">MP</div>
@@ -270,15 +281,14 @@
                 
                 // Touch control detection
                 this.isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-                this.isSmallScreen = window.innerWidth <= 768;
                 
                 // Initialize
                 this.setupKeyboard();
                 this.setupTouch();
                 this.setupGamepad();
                 
-                // Show mobile controls if needed
-                if (this.isMobile && this.isSmallScreen) {
+                // Show mobile controls if on mobile device
+                if (this.isMobile) {
                     document.getElementById('mobileControls').classList.add('show');
                 }
             }
@@ -305,6 +315,81 @@
             setupTouch() {
                 if (!this.isMobile) return;
                 
+                // Virtual Joystick handling
+                const joystick = document.getElementById('virtualJoystick');
+                const joystickHandle = document.getElementById('joystickHandle');
+                let joystickTouch = null;
+                
+                const updateJoystick = (touch) => {
+                    const rect = joystick.getBoundingClientRect();
+                    const centerX = rect.left + rect.width / 2;
+                    const centerY = rect.top + rect.height / 2;
+                    
+                    let deltaX = touch.clientX - centerX;
+                    let deltaY = touch.clientY - centerY;
+                    
+                    // Limit to circle
+                    const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+                    const maxDistance = rect.width / 2 - 30;
+                    
+                    if (distance > maxDistance) {
+                        deltaX = (deltaX / distance) * maxDistance;
+                        deltaY = (deltaY / distance) * maxDistance;
+                    }
+                    
+                    // Update visual position
+                    joystickHandle.style.transform = `translate(calc(-50% + ${deltaX}px), calc(-50% + ${deltaY}px))`;
+                    
+                    // Update input states
+                    const threshold = 30;
+                    this.keys['a'] = deltaX < -threshold;
+                    this.keys['d'] = deltaX > threshold;
+                    this.keys['s'] = deltaY > threshold;
+                    
+                    // No up key for joystick - use jump button instead
+                };
+                
+                const resetJoystick = () => {
+                    joystickHandle.style.transform = 'translate(-50%, -50%)';
+                    this.keys['a'] = false;
+                    this.keys['d'] = false;
+                    this.keys['s'] = false;
+                };
+                
+                joystick.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    if (!joystickTouch && e.changedTouches.length > 0) {
+                        joystickTouch = e.changedTouches[0].identifier;
+                        updateJoystick(e.changedTouches[0]);
+                    }
+                }, {passive: false});
+                
+                joystick.addEventListener('touchmove', (e) => {
+                    e.preventDefault();
+                    for (let touch of e.changedTouches) {
+                        if (touch.identifier === joystickTouch) {
+                            updateJoystick(touch);
+                        }
+                    }
+                }, {passive: false});
+                
+                joystick.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    for (let touch of e.changedTouches) {
+                        if (touch.identifier === joystickTouch) {
+                            joystickTouch = null;
+                            resetJoystick();
+                        }
+                    }
+                }, {passive: false});
+                
+                joystick.addEventListener('touchcancel', (e) => {
+                    e.preventDefault();
+                    joystickTouch = null;
+                    resetJoystick();
+                }, {passive: false});
+                
+                // Regular button handling
                 const handleTouchStart = (e) => {
                     e.preventDefault();
                     const button = e.target;
