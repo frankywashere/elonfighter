@@ -1,0 +1,1485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Street Fighter II Engine</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        #gameContainer {
+            position: relative;
+        }
+        canvas {
+            border: 3px solid #444;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+        .controls {
+            position: absolute;
+            bottom: -60px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            text-align: center;
+            font-size: 11px;
+            background: rgba(0,0,0,0.8);
+            padding: 8px 15px;
+            border-radius: 5px;
+            white-space: nowrap;
+        }
+        .combo-display {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: #ffff00;
+            font-size: 20px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        <div class="combo-display" id="comboDisplay"></div>
+        <div class="controls">
+            Movement: A/D (walk), S (crouch), W+A/D (jump) | Punch: U/I/O | Kick: J/K/L | Throw: I+K | Block: Hold back<br>
+            Hadouken: ↓↘→ + Punch | Shoryuken: →↓↘ + Punch | Tatsumaki: ↓↙← + Kick
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 768;
+        canvas.height = 448;
+
+        // Global game state
+        let screenShake = 0;
+        let hitPause = 0;
+        let globalFreeze = 0;
+        let comboCounter = 0;
+        let comboTimer = 0;
+
+        // SF2 Constants
+        const GROUND_Y = 380;
+        const GRAVITY = 0.7;
+        const WALK_SPEED_FORWARD = 3.2;
+        const WALK_SPEED_BACKWARD = 2.4;
+        const JUMP_VELOCITY_Y = -14;
+        const JUMP_VELOCITY_X = 4.5;
+        const THROW_RANGE = 70;
+        const THROW_TECH_WINDOW = 7;
+        
+        // Input notation for special moves
+        const MOTION_QCF = '236';  // Quarter Circle Forward
+        const MOTION_QCB = '214';  // Quarter Circle Back
+        const MOTION_DP = '623';   // Dragon Punch
+        const MOTION_HCF = '41236'; // Half Circle Forward
+        const MOTION_HCB = '63214'; // Half Circle Back
+
+        // Enhanced frame data with proximity normals
+        const FRAME_DATA = {
+            // Standing normals
+            LP: { startup: 3, active: 2, recovery: 6, damage: 4, hitstun: 11, blockstun: 9, pushback: 1, cancelable: true },
+            MP: { startup: 5, active: 3, recovery: 9, damage: 8, hitstun: 16, blockstun: 14, pushback: 2, cancelable: true },
+            HP: { startup: 8, active: 4, recovery: 18, damage: 14, hitstun: 22, blockstun: 18, pushback: 4, cancelable: false },
+            LK: { startup: 4, active: 3, recovery: 7, damage: 5, hitstun: 12, blockstun: 10, pushback: 1, cancelable: true },
+            MK: { startup: 7, active: 4, recovery: 11, damage: 9, hitstun: 18, blockstun: 15, pushback: 3, cancelable: false },
+            HK: { startup: 10, active: 5, recovery: 20, damage: 15, hitstun: 24, blockstun: 20, pushback: 5, cancelable: false },
+            
+            // Close normals
+            closeMP: { startup: 4, active: 3, recovery: 8, damage: 8, hitstun: 16, blockstun: 14, pushback: 1, cancelable: true },
+            closeHP: { startup: 6, active: 4, recovery: 14, damage: 14, hitstun: 22, blockstun: 18, pushback: 2, cancelable: true },
+            closeMK: { startup: 5, active: 4, recovery: 10, damage: 9, hitstun: 18, blockstun: 15, pushback: 2, cancelable: true },
+            closeHK: { startup: 8, active: 5, recovery: 16, damage: 15, hitstun: 24, blockstun: 20, pushback: 3, cancelable: false },
+            
+            // Crouching normals
+            crLP: { startup: 3, active: 2, recovery: 6, damage: 3, hitstun: 10, blockstun: 8, pushback: 0, cancelable: true, low: false },
+            crMP: { startup: 5, active: 3, recovery: 9, damage: 7, hitstun: 15, blockstun: 13, pushback: 1, cancelable: true, low: false },
+            crHP: { startup: 7, active: 4, recovery: 16, damage: 12, hitstun: 20, blockstun: 17, pushback: 3, cancelable: true, low: false },
+            crLK: { startup: 4, active: 2, recovery: 7, damage: 4, hitstun: 11, blockstun: 9, pushback: 0, cancelable: true, low: true },
+            crMK: { startup: 6, active: 3, recovery: 11, damage: 8, hitstun: 16, blockstun: 14, pushback: 2, cancelable: true, low: true },
+            crHK: { startup: 9, active: 5, recovery: 22, damage: 12, hitstun: 0, blockstun: 18, pushback: 4, knockdown: true, low: true },
+            
+            // Jumping normals
+            jLP: { startup: 5, active: 10, recovery: 0, damage: 6, hitstun: 14, blockstun: 12, pushback: 1 },
+            jMP: { startup: 6, active: 8, recovery: 0, damage: 10, hitstun: 18, blockstun: 16, pushback: 2 },
+            jHP: { startup: 8, active: 6, recovery: 0, damage: 14, hitstun: 22, blockstun: 20, pushback: 3 },
+            jLK: { startup: 5, active: 10, recovery: 0, damage: 6, hitstun: 14, blockstun: 12, pushback: 1 },
+            jMK: { startup: 7, active: 8, recovery: 0, damage: 10, hitstun: 18, blockstun: 16, pushback: 2 },
+            jHK: { startup: 9, active: 6, recovery: 0, damage: 14, hitstun: 22, blockstun: 20, pushback: 3 },
+            
+            // Special moves
+            hadouken: { startup: 13, active: 40, recovery: 40, damage: 12, hitstun: 20, blockstun: 16, pushback: 3, projectile: true },
+            shoryuken: { startup: 3, active: 14, recovery: 43, damage: 20, hitstun: 30, blockstun: 0, pushback: 5, invincible: 8, knockdown: true },
+            tatsumaki: { startup: 11, active: 24, recovery: 18, damage: 14, hitstun: 18, blockstun: 16, pushback: 4, hits: 3 },
+            
+            // Throw
+            throw: { startup: 3, active: 2, recovery: 24, damage: 20, range: THROW_RANGE }
+        };
+
+        // Input buffer system
+        class InputBuffer {
+            constructor() {
+                this.buffer = [];
+                this.maxBufferSize = 60;
+                this.directions = [];
+                this.buttons = [];
+            }
+
+            addDirection(dir) {
+                this.directions.push({ dir, time: 0 });
+                if (this.directions.length > 10) this.directions.shift();
+            }
+
+            addButton(btn) {
+                this.buttons.push({ btn, time: 0 });
+                if (this.buttons.length > 5) this.buttons.shift();
+            }
+
+            update() {
+                // Age inputs
+                this.directions.forEach(d => d.time++);
+                this.buttons.forEach(b => b.time++);
+                
+                // Remove old inputs
+                this.directions = this.directions.filter(d => d.time < 30);
+                this.buttons = this.buttons.filter(b => b.time < 10);
+            }
+
+            checkMotion(motion) {
+                const recent = this.directions.slice(-motion.length);
+                if (recent.length < motion.length) return false;
+                
+                const motionStr = recent.map(d => d.dir).join('');
+                return motionStr.includes(motion);
+            }
+
+            checkButton(btn) {
+                return this.buttons.some(b => b.btn === btn && b.time < 5);
+            }
+
+            clear() {
+                this.directions = [];
+                this.buttons = [];
+            }
+        }
+
+        // Projectile class
+        class Projectile {
+            constructor(x, y, facing, owner, moveData) {
+                this.x = x;
+                this.y = y;
+                this.facing = facing;
+                this.owner = owner;
+                this.velocity = facing * 8;
+                this.moveData = moveData;
+                this.active = true;
+                this.hitbox = { x: -20, y: -20, width: 40, height: 40 };
+            }
+
+            update() {
+                this.x += this.velocity;
+                
+                // Remove if off screen
+                if (this.x < -50 || this.x > canvas.width + 50) {
+                    this.active = false;
+                }
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                
+                // Draw hadouken
+                ctx.fillStyle = '#00ccff';
+                ctx.globalAlpha = 0.8;
+                ctx.beginPath();
+                ctx.arc(0, 0, 20, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.fillStyle = '#ffffff';
+                ctx.globalAlpha = 0.6;
+                ctx.beginPath();
+                ctx.arc(0, 0, 12, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.restore();
+            }
+        }
+
+        // Fighter class with full SF2 mechanics
+        class Fighter {
+            constructor(x, isPlayer) {
+                this.x = x;
+                this.y = GROUND_Y;
+                this.isPlayer = isPlayer;
+                this.facing = isPlayer ? 1 : -1;
+                
+                // Physics
+                this.velocityX = 0;
+                this.velocityY = 0;
+                this.pushbackVelocity = 0;
+                this.jumpDirection = 0; // -1 back, 0 neutral, 1 forward
+                
+                // States
+                this.state = 'idle';
+                this.crouching = false;
+                this.blocking = false;
+                this.grounded = true;
+                this.isThrowAttempt = false;
+                this.beingThrown = false;
+                this.canAct = true;
+                
+                // Combat
+                this.health = 100;
+                this.maxHealth = 100;
+                this.stunMeter = 0;
+                this.maxStun = 40;
+                this.isDizzy = false;
+                this.superMeter = 0;
+                this.maxSuper = 100;
+                
+                // Move state
+                this.currentMove = null;
+                this.moveFrame = 0;
+                this.hitstunFrames = 0;
+                this.blockstunFrames = 0;
+                this.knockdownFrames = 0;
+                this.invincibleFrames = 0;
+                this.throwTechWindow = 0;
+                
+                // Animation
+                this.animFrame = 0;
+                this.animTimer = 0;
+                this.hitEffects = [];
+                
+                // Input
+                this.inputBuffer = new InputBuffer();
+                this.lastHit = null;
+                this.comboCount = 0;
+                
+                // Hitboxes
+                this.hurtboxes = [];
+                this.hitboxes = [];
+                
+                // Projectiles
+                this.projectiles = [];
+            }
+
+            handleInput(keys) {
+                // Update directional inputs for special moves
+                const dirs = [];
+                if (keys['s']) dirs.push('2');
+                if (keys['w']) dirs.push('8');
+                if (this.facing === 1) {
+                    if (keys['a']) dirs.push('4');
+                    if (keys['d']) dirs.push('6');
+                } else {
+                    if (keys['a']) dirs.push('6');
+                    if (keys['d']) dirs.push('4');
+                }
+                
+                if (dirs.length === 0) dirs.push('5'); // Neutral
+                
+                // Add to input buffer
+                dirs.forEach(dir => {
+                    if (!this.inputBuffer.directions.length || 
+                        this.inputBuffer.directions[this.inputBuffer.directions.length - 1].dir !== dir) {
+                        this.inputBuffer.addDirection(dir);
+                    }
+                });
+                
+                // Can't act during hitstun/blockstun
+                if (this.hitstunFrames > 0 || this.blockstunFrames > 0 || this.knockdownFrames > 0) {
+                    return;
+                }
+                
+                // Check for throw
+                if (keys['i'] && keys['k'] && this.state !== 'attack' && this.grounded) {
+                    this.attemptThrow();
+                    return;
+                }
+                
+                // Check for special moves first
+                if (this.state !== 'attack' || (this.currentMove && FRAME_DATA[this.currentMove].cancelable)) {
+                    // Shoryuken (Dragon Punch motion)
+                    if (this.inputBuffer.checkMotion('623') && (keys['u'] || keys['i'] || keys['o'])) {
+                        this.performSpecialMove('shoryuken');
+                        return;
+                    }
+                    
+                    // Hadouken (Quarter Circle Forward)
+                    if (this.inputBuffer.checkMotion('236') && (keys['u'] || keys['i'] || keys['o'])) {
+                        this.performSpecialMove('hadouken');
+                        return;
+                    }
+                    
+                    // Tatsumaki (Quarter Circle Back)
+                    if (this.inputBuffer.checkMotion('214') && (keys['j'] || keys['k'] || keys['l'])) {
+                        this.performSpecialMove('tatsumaki');
+                        return;
+                    }
+                }
+                
+                // Check if opponent is attacking or has projectiles
+                const opponent = this.isPlayer ? aiPlayer : player;
+                const opponentAttacking = opponent.state === 'attack' || opponent.projectiles.length > 0;
+                const distance = Math.abs(this.x - opponent.x);
+                
+                // Blocking - only when holding back AND opponent is attacking nearby
+                const backKey = this.facing === 1 ? 'a' : 'd';
+                this.blocking = keys[backKey] && !this.isDizzy && opponentAttacking && distance < 200;
+                
+                // Movement
+                if (this.state !== 'attack') {
+                    // Walking - always allow movement unless in attack state
+                    if (keys['a'] && !this.crouching) {
+                        this.walk(-1); // Always move left with A
+                    } else if (keys['d'] && !this.crouching) {
+                        this.walk(1);  // Always move right with D
+                    } else if (this.grounded && Math.abs(this.velocityX) < 0.5) {
+                        this.state = this.crouching ? 'crouch' : 'idle';
+                    }
+                    
+                    // Crouching
+                    if (keys['s']) {
+                        this.crouch();
+                    } else {
+                        this.crouching = false;
+                    }
+                    
+                    // Jumping - SF2 style with directional jumps
+                    if (keys['w'] && this.grounded && !this.crouching) {
+                        if (keys['a']) {
+                            this.jump(-1); // Jump backward (left)
+                        } else if (keys['d']) {
+                            this.jump(1);  // Jump forward (right)
+                        } else {
+                            this.jump(0);  // Neutral jump
+                        }
+                    }
+                }
+                
+                // Normal attacks
+                if (this.state !== 'attack' || this.canCancelIntoNormal()) {
+                    if (!this.grounded) {
+                        // Jumping attacks
+                        if (keys['u']) this.attack('jLP');
+                        else if (keys['i']) this.attack('jMP');
+                        else if (keys['o']) this.attack('jHP');
+                        else if (keys['j']) this.attack('jLK');
+                        else if (keys['k']) this.attack('jMK');
+                        else if (keys['l']) this.attack('jHK');
+                    } else if (this.crouching) {
+                        // Crouching attacks
+                        if (keys['u']) this.attack('crLP');
+                        else if (keys['i']) this.attack('crMP');
+                        else if (keys['o']) this.attack('crHP');
+                        else if (keys['j']) this.attack('crLK');
+                        else if (keys['k']) this.attack('crMK');
+                        else if (keys['l']) this.attack('crHK');
+                    } else {
+                        // Standing attacks - check proximity
+                        const opponent = this.isPlayer ? aiPlayer : player;
+                        const distance = Math.abs(this.x - opponent.x);
+                        const isClose = distance < 80;
+                        
+                        if (keys['u']) this.attack('LP');
+                        else if (keys['i']) this.attack(isClose ? 'closeMP' : 'MP');
+                        else if (keys['o']) this.attack(isClose ? 'closeHP' : 'HP');
+                        else if (keys['j']) this.attack('LK');
+                        else if (keys['k']) this.attack(isClose ? 'closeMK' : 'MK');
+                        else if (keys['l']) this.attack(isClose ? 'closeHK' : 'HK');
+                    }
+                }
+            }
+
+            walk(direction) {
+                if (this.grounded && !this.crouching) {
+                    const speed = direction === this.facing ? WALK_SPEED_FORWARD : WALK_SPEED_BACKWARD;
+                    this.velocityX = direction * speed;
+                    this.state = 'walk';
+                }
+            }
+
+            crouch() {
+                if (this.grounded) {
+                    this.crouching = true;
+                    this.state = 'crouch';
+                    this.velocityX = 0;
+                }
+            }
+
+            jump(direction) {
+                this.velocityY = JUMP_VELOCITY_Y;
+                this.jumpDirection = direction;
+                this.velocityX = direction * JUMP_VELOCITY_X;
+                this.grounded = false;
+                this.state = 'jump';
+            }
+
+            attack(button) {
+                // Cancel rules
+                if (this.state === 'attack' && this.currentMove) {
+                    const currentData = FRAME_DATA[this.currentMove];
+                    if (!currentData.cancelable || this.moveFrame < currentData.startup + currentData.active) {
+                        return; // Can't cancel yet
+                    }
+                }
+                
+                this.state = 'attack';
+                this.currentMove = button;
+                this.moveFrame = 0;
+                this.inputBuffer.addButton(button);
+            }
+
+            performSpecialMove(move) {
+                if (this.state === 'attack' && this.currentMove) {
+                    const currentData = FRAME_DATA[this.currentMove];
+                    if (!currentData.cancelable) return;
+                }
+                
+                this.state = 'attack';
+                this.currentMove = move;
+                this.moveFrame = 0;
+                
+                // Special properties
+                if (move === 'shoryuken') {
+                    this.invincibleFrames = FRAME_DATA[move].invincible;
+                    this.velocityY = -10;
+                    this.grounded = false;
+                } else if (move === 'tatsumaki') {
+                    this.velocityX = this.facing * 4;
+                    if (!this.grounded) this.velocityY = -2;
+                } else if (move === 'hadouken' && this.grounded) {
+                    // Will spawn projectile during active frames
+                }
+                
+                // Clear input buffer
+                this.inputBuffer.clear();
+            }
+
+            attemptThrow() {
+                const opponent = this.isPlayer ? aiPlayer : player;
+                const distance = Math.abs(this.x - opponent.x);
+                
+                if (distance < THROW_RANGE && opponent.grounded && !opponent.knockdownFrames) {
+                    this.state = 'attack';
+                    this.currentMove = 'throw';
+                    this.moveFrame = 0;
+                    this.isThrowAttempt = true;
+                    
+                    // Give opponent tech window
+                    opponent.throwTechWindow = THROW_TECH_WINDOW;
+                }
+            }
+
+            canCancelIntoNormal() {
+                // Link timing for combos
+                if (this.state === 'idle' && this.moveFrame < 3) {
+                    return true;
+                }
+                return false;
+            }
+
+            updateHitboxes() {
+                this.hurtboxes = [];
+                this.hitboxes = [];
+                
+                // Invincibility check
+                if (this.invincibleFrames > 0) {
+                    return; // No hurtboxes during invincibility
+                }
+                
+                // Hurtboxes based on state
+                if (this.knockdownFrames > 0) {
+                    this.hurtboxes.push({ x: -40, y: -20, width: 80, height: 20 });
+                } else if (this.crouching) {
+                    this.hurtboxes.push({ x: -25, y: -60, width: 50, height: 60 });
+                } else if (!this.grounded) {
+                    this.hurtboxes.push({ x: -25, y: -90, width: 50, height: 90 });
+                } else {
+                    this.hurtboxes.push({ x: -25, y: -100, width: 50, height: 100 });
+                }
+                
+                // Attack hitboxes
+                if (this.state === 'attack' && this.currentMove) {
+                    const frameData = FRAME_DATA[this.currentMove];
+                    if (this.moveFrame >= frameData.startup && 
+                        this.moveFrame < frameData.startup + frameData.active) {
+                        
+                        if (this.currentMove === 'throw') {
+                            this.hitboxes.push({
+                                x: this.facing === 1 ? 10 : -60,
+                                y: -80,
+                                width: 50,
+                                height: 60,
+                                type: 'throw'
+                            });
+                        } else if (this.currentMove.includes('P') || this.currentMove.includes('punch')) {
+                            // Punch hitboxes
+                            let reach = 50;
+                            if (this.currentMove.includes('H')) reach = 70;
+                            else if (this.currentMove.includes('M')) reach = 60;
+                            
+                            this.hitboxes.push({
+                                x: this.facing === 1 ? 25 : -25 - reach,
+                                y: this.currentMove.includes('cr') ? -40 : -80,
+                                width: reach,
+                                height: 25
+                            });
+                        } else if (this.currentMove.includes('K') || this.currentMove === 'tatsumaki') {
+                            // Kick hitboxes
+                            let reach = 60;
+                            if (this.currentMove.includes('H')) reach = 90;
+                            else if (this.currentMove.includes('M')) reach = 75;
+                            
+                            this.hitboxes.push({
+                                x: this.facing === 1 ? 25 : -25 - reach,
+                                y: this.currentMove.includes('cr') ? -30 : this.currentMove.includes('j') ? -40 : -60,
+                                width: reach,
+                                height: 30
+                            });
+                        } else if (this.currentMove === 'shoryuken') {
+                            // Rising uppercut hitbox
+                            this.hitboxes.push({
+                                x: this.facing === 1 ? 10 : -40,
+                                y: -100,
+                                width: 30,
+                                height: 80
+                            });
+                        }
+                    }
+                }
+            }
+
+            update() {
+                // Update input buffer
+                this.inputBuffer.update();
+                
+                // Update invincibility
+                if (this.invincibleFrames > 0) this.invincibleFrames--;
+                
+                // Update throw tech window
+                if (this.throwTechWindow > 0) {
+                    this.throwTechWindow--;
+                    // Check for tech input
+                    if (this.throwTechWindow > 0 && this.inputBuffer.checkButton('throw')) {
+                        // Successful tech
+                        this.pushbackVelocity = -this.facing * 3;
+                        this.throwTechWindow = 0;
+                    }
+                }
+                
+                // Update stun states
+                if (this.hitstunFrames > 0) {
+                    this.hitstunFrames--;
+                    this.state = 'hitstun';
+                } else if (this.blockstunFrames > 0) {
+                    this.blockstunFrames--;
+                    this.state = 'blockstun';
+                } else if (this.knockdownFrames > 0) {
+                    this.knockdownFrames--;
+                    this.state = 'knockdown';
+                    if (this.knockdownFrames === 0) {
+                        this.state = 'idle';
+                        this.y = GROUND_Y;
+                    }
+                } else if (this.isDizzy) {
+                    this.state = 'dizzy';
+                }
+                
+                // Update dizzy state
+                if (this.stunMeter > 0 && this.state !== 'hitstun') {
+                    this.stunMeter -= 0.2;
+                    if (this.stunMeter <= 0) {
+                        this.isDizzy = false;
+                    }
+                }
+                
+                // Update attack state
+                if (this.state === 'attack' && this.currentMove) {
+                    this.moveFrame++;
+                    const frameData = FRAME_DATA[this.currentMove];
+                    
+                    // Spawn projectile for hadouken
+                    if (this.currentMove === 'hadouken' && this.moveFrame === frameData.startup) {
+                        this.projectiles.push(new Projectile(
+                            this.x + this.facing * 40,
+                            this.y - 60,
+                            this.facing,
+                            this,
+                            frameData
+                        ));
+                    }
+                    
+                    // End move
+                    if (frameData.hits && frameData.hits > 1) {
+                        // Multi-hit moves like tatsumaki
+                        if (this.moveFrame >= frameData.startup + frameData.active + frameData.recovery) {
+                            this.endAttack();
+                        }
+                    } else if (this.moveFrame >= frameData.startup + frameData.active + frameData.recovery) {
+                        this.endAttack();
+                    }
+                }
+                
+                // Physics
+                if (!this.grounded) {
+                    this.velocityY += GRAVITY;
+                }
+                
+                this.y += this.velocityY;
+                this.x += this.velocityX + this.pushbackVelocity;
+                
+                // Ground collision
+                if (this.y >= GROUND_Y) {
+                    this.y = GROUND_Y;
+                    this.grounded = true;
+                    this.velocityY = 0;
+                    this.jumpDirection = 0;
+                    
+                    if (this.state === 'jump') {
+                        this.state = 'idle';
+                    }
+                    
+                    // Landing recovery for some moves
+                    if (this.currentMove === 'shoryuken' || this.currentMove === 'tatsumaki') {
+                        this.moveFrame = 100; // Force recovery
+                    }
+                } else {
+                    this.grounded = false;
+                }
+                
+                // Friction
+                if (this.grounded) {
+                    this.velocityX *= 0.85;
+                }
+                this.pushbackVelocity *= 0.9;
+                
+                // Bounds
+                this.x = Math.max(50, Math.min(canvas.width - 50, this.x));
+                
+                // Update facing
+                const opponent = this.isPlayer ? aiPlayer : player;
+                if (opponent && this.state !== 'attack' && !this.knockdownFrames) {
+                    this.facing = this.x < opponent.x ? 1 : -1;
+                }
+                
+                // Update hitboxes
+                this.updateHitboxes();
+                
+                // Update projectiles
+                this.projectiles = this.projectiles.filter(p => {
+                    p.update();
+                    return p.active;
+                });
+                
+                // Animation
+                this.animTimer++;
+                if (this.animTimer > 6) {
+                    this.animTimer = 0;
+                    this.animFrame = (this.animFrame + 1) % 4;
+                }
+                
+                // Update hit effects
+                this.hitEffects = this.hitEffects.filter(effect => {
+                    effect.life--;
+                    return effect.life > 0;
+                });
+            }
+
+            endAttack() {
+                this.state = 'idle';
+                this.currentMove = null;
+                this.moveFrame = 0;
+                this.isThrowAttempt = false;
+            }
+
+            takeDamage(damage, hitstun, blockstun, pushback, knockdown = false, attacker = null) {
+                const blocked = this.blocking && this.grounded && 
+                    (!FRAME_DATA[attacker?.currentMove]?.low || this.crouching);
+                
+                if (blocked) {
+                    // Chip damage
+                    this.health -= damage * 0.1;
+                    this.blockstunFrames = blockstun;
+                    this.pushbackVelocity = -this.facing * pushback * 0.6;
+                    
+                    // Block spark
+                    this.hitEffects.push({
+                        type: 'block',
+                        x: this.facing * 30,
+                        y: -60,
+                        life: 8
+                    });
+                } else {
+                    // Full damage
+                    this.health -= damage;
+                    this.stunMeter += damage * 0.5;
+                    
+                    if (this.stunMeter >= this.maxStun) {
+                        this.isDizzy = true;
+                        this.stunMeter = this.maxStun;
+                    }
+                    
+                    if (knockdown) {
+                        this.knockdownFrames = 60;
+                        this.velocityY = -8;
+                        this.pushbackVelocity = -this.facing * pushback * 1.5;
+                    } else {
+                        this.hitstunFrames = hitstun;
+                        this.pushbackVelocity = -this.facing * pushback;
+                    }
+                    
+                    // Hit spark
+                    this.hitEffects.push({
+                        type: 'hit',
+                        x: this.facing * 20,
+                        y: -60,
+                        life: 6
+                    });
+                    
+                    // Combo tracking
+                    if (attacker && attacker.comboCount > 0) {
+                        attacker.comboCount++;
+                    } else if (attacker) {
+                        attacker.comboCount = 1;
+                    }
+                    
+                    // Screen effects
+                    screenShake = knockdown ? 8 : 4;
+                    hitPause = 3;
+                }
+                
+                this.health = Math.max(0, this.health);
+            }
+
+            drawCharacter() {
+                ctx.save();
+                
+                const scale = 4;
+                
+                // Flip for facing
+                if (this.facing === -1) {
+                    ctx.translate(this.x, 0);
+                    ctx.scale(-1, 1);
+                    ctx.translate(-this.x, 0);
+                }
+                
+                // Draw pixel helper
+                const drawPixel = (x, y, color) => {
+                    ctx.fillStyle = color;
+                    ctx.fillRect(this.x + x * scale - 32, this.y + y * scale - 100, scale, scale);
+                };
+                
+                // Dizzy stars
+                if (this.isDizzy) {
+                    ctx.fillStyle = '#ffff00';
+                    const starY = Math.sin(this.animTimer * 0.2) * 5 - 120;
+                    ctx.fillText('★', this.x - 20, this.y + starY);
+                    ctx.fillText('★', this.x, this.y + starY - 10);
+                    ctx.fillText('★', this.x + 20, this.y + starY);
+                }
+                
+                // Different poses based on state
+                if (this.knockdownFrames > 0) {
+                    // Knocked down
+                    for (let i = 0; i < 20; i++) {
+                        for (let j = 0; j < 6; j++) {
+                            if ((i + j) % 3 === 0) {
+                                drawPixel(i - 10, 22 + j, '#e8e8e8');
+                            }
+                        }
+                    }
+                } else if (this.state === 'dizzy') {
+                    // Dizzy wobble
+                    const wobble = Math.sin(this.animTimer * 0.3) * 2;
+                    // Draw normal standing but offset
+                    ctx.translate(wobble, 0);
+                }
+                
+                // Main character drawing
+                if (this.currentMove === 'shoryuken') {
+                    // Rising uppercut pose
+                    // Head tilted back
+                    for (let i = 7; i < 11; i++) {
+                        for (let j = 0; j < 4; j++) {
+                            drawPixel(i, j, '#f4c292');
+                        }
+                    }
+                    
+                    // Extended arm up
+                    for (let j = 4; j < 12; j++) {
+                        drawPixel(9, j, '#f4c292');
+                        drawPixel(10, j, '#f4c292');
+                    }
+                    
+                    // Body
+                    for (let i = 6; i < 12; i++) {
+                        for (let j = 8; j < 14; j++) {
+                            drawPixel(i, j, '#e8e8e8');
+                        }
+                    }
+                } else if (this.currentMove === 'hadouken' && this.moveFrame > 10) {
+                    // Hadouken pose - both arms forward
+                    // Head
+                    for (let i = 6; i < 10; i++) {
+                        for (let j = 2; j < 6; j++) {
+                            drawPixel(i, j, '#f4c292');
+                        }
+                    }
+                    
+                    // Extended arms
+                    for (let i = 10; i < 16; i++) {
+                        drawPixel(i, 8, '#f4c292');
+                        drawPixel(i, 9, '#f4c292');
+                    }
+                    
+                    // Body
+                    for (let i = 5; i < 11; i++) {
+                        for (let j = 6; j < 12; j++) {
+                            drawPixel(i, j, '#e8e8e8');
+                        }
+                    }
+                } else if (this.crouching) {
+                    // Crouching
+                    // Head
+                    for (let i = 6; i < 10; i++) {
+                        for (let j = 8; j < 12; j++) {
+                            drawPixel(i, j, '#f4c292');
+                        }
+                    }
+                    
+                    // Hair
+                    for (let i = 5; i < 11; i++) {
+                        drawPixel(i, 7, '#8b6f47');
+                    }
+                    
+                    // Body
+                    for (let i = 5; i < 11; i++) {
+                        for (let j = 12; j < 16; j++) {
+                            drawPixel(i, j, '#e8e8e8');
+                        }
+                    }
+                    
+                    // Belt
+                    for (let i = 5; i < 11; i++) {
+                        drawPixel(i, 16, '#8b4513');
+                    }
+                    
+                    // Legs
+                    for (let i = 4; i < 12; i++) {
+                        for (let j = 17; j < 20; j++) {
+                            if (i > 5 && i < 10) {
+                                drawPixel(i, j, '#ff7f50');
+                            }
+                        }
+                    }
+                    
+                    // Attack extension
+                    if (this.state === 'attack' && this.currentMove) {
+                        if (this.currentMove.includes('P')) {
+                            for (let i = 11; i < 14; i++) {
+                                drawPixel(i, 13, '#f4c292');
+                            }
+                        } else if (this.currentMove.includes('K')) {
+                            for (let i = 12; i < 17; i++) {
+                                drawPixel(i, 18, '#ff7f50');
+                                drawPixel(i, 19, '#ff7f50');
+                            }
+                        }
+                    }
+                } else if (!this.grounded) {
+                    // Jumping
+                    // Head
+                    for (let i = 6; i < 10; i++) {
+                        for (let j = 2; j < 6; j++) {
+                            drawPixel(i, j, '#f4c292');
+                        }
+                    }
+                    
+                    // Body
+                    for (let i = 5; i < 11; i++) {
+                        for (let j = 6; j < 12; j++) {
+                            drawPixel(i, j, '#e8e8e8');
+                        }
+                    }
+                    
+                    // Jumping kick pose
+                    if (this.currentMove && this.currentMove.includes('K')) {
+                        // Extended leg
+                        for (let i = 11; i < 18; i++) {
+                            drawPixel(i, 10, '#ff7f50');
+                            drawPixel(i, 11, '#ff7f50');
+                        }
+                        drawPixel(18, 10, '#f4c292');
+                    } else {
+                        // Bent legs
+                        for (let i = 6; i < 10; i++) {
+                            for (let j = 12; j < 16; j++) {
+                                drawPixel(i, j, '#ff7f50');
+                            }
+                        }
+                    }
+                } else {
+                    // Standing/walking
+                    // Head
+                    for (let i = 6; i < 10; i++) {
+                        for (let j = 2; j < 6; j++) {
+                            drawPixel(i, j, '#f4c292');
+                        }
+                    }
+                    
+                    // Hair
+                    for (let i = 5; i < 11; i++) {
+                        drawPixel(i, 1, '#8b6f47');
+                    }
+                    for (let i = 6; i < 10; i++) {
+                        drawPixel(i, 0, '#8b6f47');
+                    }
+                    
+                    // Eyes
+                    drawPixel(7, 3, '#000');
+                    drawPixel(9, 3, '#000');
+                    
+                    // Body
+                    for (let i = 5; i < 11; i++) {
+                        for (let j = 6; j < 12; j++) {
+                            drawPixel(i, j, '#e8e8e8');
+                        }
+                    }
+                    
+                    // Belt
+                    for (let i = 5; i < 11; i++) {
+                        drawPixel(i, 12, '#8b4513');
+                    }
+                    
+                    // Pants
+                    for (let i = 5; i < 11; i++) {
+                        for (let j = 13; j < 20; j++) {
+                            if (j < 18 || (i > 6 && i < 9)) {
+                                drawPixel(i, j, '#ff7f50');
+                            }
+                        }
+                    }
+                    
+                    // Attack poses
+                    if (this.state === 'attack' && this.currentMove) {
+                        if (this.currentMove.includes('P')) {
+                            // Punch
+                            const extension = this.currentMove.includes('H') ? 5 : 
+                                           this.currentMove.includes('M') ? 4 : 3;
+                            for (let i = 11; i < 11 + extension; i++) {
+                                drawPixel(i, 7, '#f4c292');
+                            }
+                            drawPixel(11 + extension, 6, '#f4c292');
+                            drawPixel(11 + extension, 7, '#f4c292');
+                            drawPixel(11 + extension, 8, '#f4c292');
+                        } else if (this.currentMove.includes('K')) {
+                            // Kick
+                            const extension = this.currentMove.includes('H') ? 7 : 
+                                           this.currentMove.includes('M') ? 5 : 4;
+                            for (let i = 11; i < 11 + extension; i++) {
+                                drawPixel(i, 14, '#ff7f50');
+                                drawPixel(i, 15, '#ff7f50');
+                            }
+                            drawPixel(11 + extension, 14, '#f4c292');
+                        }
+                    } else if (this.blocking) {
+                        // Block pose
+                        drawPixel(6, 5, '#f4c292');
+                        drawPixel(7, 5, '#f4c292');
+                        drawPixel(8, 5, '#f4c292');
+                        drawPixel(9, 5, '#f4c292');
+                    } else {
+                        // Idle arms
+                        drawPixel(4, 7 + Math.sin(this.animTimer * 0.1), '#f4c292');
+                        drawPixel(4, 8 + Math.sin(this.animTimer * 0.1), '#f4c292');
+                        drawPixel(11, 7 + Math.cos(this.animTimer * 0.1), '#f4c292');
+                        drawPixel(11, 8 + Math.cos(this.animTimer * 0.1), '#f4c292');
+                    }
+                    
+                    // Walking animation
+                    if (this.state === 'walk') {
+                        const walkFrame = Math.floor(this.animFrame / 2);
+                        drawPixel(6 + walkFrame, 20, '#f4c292');
+                        drawPixel(9 - walkFrame, 20, '#f4c292');
+                    } else {
+                        drawPixel(6, 20, '#f4c292');
+                        drawPixel(9, 20, '#f4c292');
+                    }
+                }
+                
+                ctx.restore();
+                
+                // Draw hit effects
+                this.hitEffects.forEach(effect => {
+                    ctx.save();
+                    ctx.translate(this.x + effect.x, this.y + effect.y);
+                    
+                    if (effect.type === 'hit') {
+                        // Hit spark
+                        ctx.strokeStyle = '#ffff00';
+                        ctx.lineWidth = 3;
+                        const size = effect.life * 4;
+                        ctx.beginPath();
+                        for (let i = 0; i < 8; i++) {
+                            const angle = (i / 8) * Math.PI * 2;
+                            const r = i % 2 === 0 ? size : size * 0.5;
+                            const x = Math.cos(angle) * r;
+                            const y = Math.sin(angle) * r;
+                            if (i === 0) ctx.moveTo(x, y);
+                            else ctx.lineTo(x, y);
+                        }
+                        ctx.closePath();
+                        ctx.stroke();
+                    } else if (effect.type === 'block') {
+                        // Block spark
+                        ctx.fillStyle = '#00ccff';
+                        ctx.globalAlpha = effect.life / 8;
+                        ctx.fillRect(-15, -15, 30, 30);
+                    }
+                    
+                    ctx.restore();
+                });
+                
+                // Draw projectiles
+                this.projectiles.forEach(p => p.draw());
+            }
+
+            drawHealthBar(x, y) {
+                // Background
+                ctx.fillStyle = '#000';
+                ctx.fillRect(x, y, 320, 30);
+                
+                // Red background
+                ctx.fillStyle = '#660000';
+                ctx.fillRect(x + 2, y + 2, 316, 26);
+                
+                // Yellow health
+                const healthWidth = (this.health / this.maxHealth) * 316;
+                const gradient = ctx.createLinearGradient(x + 2, y + 2, x + 2, y + 28);
+                gradient.addColorStop(0, '#ffff00');
+                gradient.addColorStop(1, '#ff9900');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(x + 2, y + 2, healthWidth, 26);
+                
+                // Health bar segments
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 1;
+                for (let i = 1; i < 10; i++) {
+                    const segX = x + 2 + (316 / 10) * i;
+                    ctx.beginPath();
+                    ctx.moveTo(segX, y + 2);
+                    ctx.lineTo(segX, y + 28);
+                    ctx.stroke();
+                }
+                
+                // Border
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(x, y, 320, 30);
+                
+                // Name
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 18px monospace';
+                ctx.shadowColor = '#000';
+                ctx.shadowBlur = 3;
+                ctx.fillText(this.isPlayer ? 'P1' : 'CPU', x + 5, y - 5);
+                ctx.shadowBlur = 0;
+                
+                // Stun bar
+                if (this.stunMeter > 0) {
+                    const stunWidth = (this.stunMeter / this.maxStun) * 100;
+                    ctx.fillStyle = '#ff00ff';
+                    ctx.fillRect(x, y + 32, stunWidth, 4);
+                    ctx.strokeStyle = '#fff';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(x, y + 32, 100, 4);
+                }
+                
+                // Super meter
+                const superWidth = (this.superMeter / this.maxSuper) * 150;
+                ctx.fillStyle = '#0099ff';
+                ctx.fillRect(x, y + 38, superWidth, 8);
+                ctx.strokeStyle = '#fff';
+                ctx.strokeRect(x, y + 38, 150, 8);
+            }
+
+            draw() {
+                this.drawCharacter();
+                this.drawHealthBar(this.isPlayer ? 40 : 408, 40);
+            }
+        }
+
+        // Enhanced AI
+        class AIController {
+            constructor(fighter) {
+                this.fighter = fighter;
+                this.reactionTimer = 0;
+                this.strategy = 'neutral';
+                this.moveQueue = [];
+                this.lastPlayerMove = null;
+            }
+
+            update(player) {
+                if (this.reactionTimer > 0) {
+                    this.reactionTimer--;
+                    return;
+                }
+                
+                const distance = Math.abs(this.fighter.x - player.x);
+                const heightDiff = player.y - this.fighter.y;
+                
+                // Anti-air if player is jumping
+                if (!player.grounded && distance < 120 && heightDiff < -50) {
+                    this.fighter.inputBuffer.addDirection('6');
+                    this.fighter.inputBuffer.addDirection('2');
+                    this.fighter.inputBuffer.addDirection('3');
+                    this.fighter.performSpecialMove('shoryuken');
+                    this.reactionTimer = 30;
+                    return;
+                }
+                
+                // Block on reaction
+                if (player.state === 'attack' && distance < 150) {
+                    if (Math.random() < 0.8) {
+                        this.fighter.blocking = true;
+                        this.fighter.crouching = player.currentMove && player.currentMove.includes('cr');
+                        this.reactionTimer = 10;
+                        return;
+                    }
+                }
+                
+                // Offensive patterns
+                if (distance > 200) {
+                    // Approach
+                    if (Math.random() < 0.3) {
+                        this.fighter.jump(1);
+                        this.reactionTimer = 40;
+                    } else if (Math.random() < 0.1) {
+                        // Fireball
+                        this.fighter.inputBuffer.addDirection('2');
+                        this.fighter.inputBuffer.addDirection('3');
+                        this.fighter.inputBuffer.addDirection('6');
+                        this.fighter.performSpecialMove('hadouken');
+                        this.reactionTimer = 60;
+                    } else {
+                        this.fighter.walk(1);
+                        this.reactionTimer = 5;
+                    }
+                } else if (distance < 70) {
+                    // Close combat
+                    const r = Math.random();
+                    if (r < 0.2) {
+                        this.fighter.attack('LP');
+                        this.reactionTimer = 15;
+                    } else if (r < 0.3) {
+                        this.fighter.attack('closeMP');
+                        this.reactionTimer = 20;
+                    } else if (r < 0.4) {
+                        this.fighter.attemptThrow();
+                        this.reactionTimer = 30;
+                    } else if (r < 0.5) {
+                        this.fighter.crouch();
+                        this.fighter.attack('crMK');
+                        this.reactionTimer = 25;
+                    } else if (r < 0.6) {
+                        // Dragon punch
+                        this.fighter.inputBuffer.addDirection('6');
+                        this.fighter.inputBuffer.addDirection('2');
+                        this.fighter.inputBuffer.addDirection('3');
+                        this.fighter.performSpecialMove('shoryuken');
+                        this.reactionTimer = 50;
+                    }
+                } else {
+                    // Mid range
+                    if (Math.random() < 0.3) {
+                        this.fighter.attack('MK');
+                        this.reactionTimer = 25;
+                    } else if (Math.random() < 0.1) {
+                        this.fighter.crouch();
+                        this.fighter.attack('crHK');
+                        this.reactionTimer = 35;
+                    }
+                }
+                
+                // Reset blocking
+                if (this.fighter.blocking && player.state !== 'attack') {
+                    this.fighter.blocking = false;
+                }
+            }
+        }
+
+        // Initialize game
+        const player = new Fighter(200, true);
+        const aiPlayer = new Fighter(568, false);
+        const aiController = new AIController(aiPlayer);
+        
+        // Input handling
+        const keys = {};
+        
+        document.addEventListener('keydown', (e) => {
+            const key = e.key.toLowerCase();
+            keys[key] = true;
+            
+            // Restart game on ESC
+            if (key === 'escape' && gameOver) {
+                location.reload();
+            }
+            
+            e.preventDefault();
+        });
+        
+        document.addEventListener('keyup', (e) => {
+            keys[e.key.toLowerCase()] = false;
+            e.preventDefault();
+        });
+
+        // Collision system
+        function checkCollisions() {
+            // Check all attacks
+            [player, aiPlayer].forEach((attacker, i) => {
+                const defender = i === 0 ? aiPlayer : player;
+                
+                // Regular attacks
+                attacker.hitboxes.forEach(hitbox => {
+                    defender.hurtboxes.forEach(hurtbox => {
+                        const hit1 = {
+                            x: attacker.x + hitbox.x,
+                            y: attacker.y + hitbox.y,
+                            width: hitbox.width,
+                            height: hitbox.height
+                        };
+                        const hurt2 = {
+                            x: defender.x + hurtbox.x,
+                            y: defender.y + hurtbox.y,
+                            width: hurtbox.width,
+                            height: hurtbox.height
+                        };
+                        
+                        if (hit1.x < hurt2.x + hurt2.width &&
+                            hit1.x + hit1.width > hurt2.x &&
+                            hit1.y < hurt2.y + hurt2.height &&
+                            hit1.y + hit1.height > hurt2.y) {
+                            
+                            // Hit confirmed
+                            if (attacker.lastHit !== attacker.currentMove + attacker.moveFrame) {
+                                const moveData = FRAME_DATA[attacker.currentMove];
+                                
+                                if (hitbox.type === 'throw' && defender.throwTechWindow <= 0) {
+                                    // Successful throw
+                                    defender.beingThrown = true;
+                                    defender.knockdownFrames = 40;
+                                    defender.velocityY = -6;
+                                    defender.pushbackVelocity = -defender.facing * 8;
+                                    defender.takeDamage(moveData.damage, 0, 0, 0, true, attacker);
+                                } else if (hitbox.type !== 'throw') {
+                                    // Normal hit
+                                    defender.takeDamage(
+                                        moveData.damage,
+                                        moveData.hitstun,
+                                        moveData.blockstun,
+                                        moveData.pushback,
+                                        moveData.knockdown,
+                                        attacker
+                                    );
+                                }
+                                
+                                attacker.lastHit = attacker.currentMove + attacker.moveFrame;
+                                
+                                // Build super meter
+                                attacker.superMeter = Math.min(attacker.maxSuper, 
+                                    attacker.superMeter + moveData.damage * 0.5);
+                            }
+                        }
+                    });
+                });
+                
+                // Projectile collisions
+                attacker.projectiles.forEach(proj => {
+                    defender.hurtboxes.forEach(hurtbox => {
+                        const projHit = {
+                            x: proj.x + proj.hitbox.x,
+                            y: proj.y + proj.hitbox.y,
+                            width: proj.hitbox.width,
+                            height: proj.hitbox.height
+                        };
+                        const hurt = {
+                            x: defender.x + hurtbox.x,
+                            y: defender.y + hurtbox.y,
+                            width: hurtbox.width,
+                            height: hurtbox.height
+                        };
+                        
+                        if (projHit.x < hurt.x + hurt.width &&
+                            projHit.x + projHit.width > hurt.x &&
+                            projHit.y < hurt.y + hurt.height &&
+                            projHit.y + projHit.height > hurt.y) {
+                            
+                            defender.takeDamage(
+                                proj.moveData.damage,
+                                proj.moveData.hitstun,
+                                proj.moveData.blockstun,
+                                proj.moveData.pushback,
+                                false,
+                                attacker
+                            );
+                            proj.active = false;
+                        }
+                    });
+                });
+            });
+            
+            // Push apart if too close
+            const minDistance = 50;
+            const distance = Math.abs(player.x - aiPlayer.x);
+            if (distance < minDistance && Math.abs(player.y - aiPlayer.y) < 50) {
+                const push = (minDistance - distance) / 2;
+                if (player.x < aiPlayer.x) {
+                    player.x -= push;
+                    aiPlayer.x += push;
+                } else {
+                    player.x += push;
+                    aiPlayer.x -= push;
+                }
+            }
+        }
+
+        // Main game loop
+        let gameOver = false;
+        let winner = null;
+        
+        function gameLoop() {
+            // Handle global effects
+            if (hitPause > 0) {
+                hitPause--;
+                requestAnimationFrame(gameLoop);
+                return;
+            }
+            
+            // Update screen shake
+            if (screenShake > 0) {
+                screenShake *= 0.9;
+                if (screenShake < 0.1) screenShake = 0;
+            }
+            
+            // Clear with shake
+            ctx.save();
+            if (screenShake > 0) {
+                ctx.translate(
+                    Math.random() * screenShake - screenShake / 2,
+                    Math.random() * screenShake - screenShake / 2
+                );
+            }
+            
+            // Background
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            gradient.addColorStop(0, '#87CEEB');
+            gradient.addColorStop(0.7, '#98D8E8');
+            gradient.addColorStop(1, '#F0E68C');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Ground
+            ctx.fillStyle = '#8B7355';
+            ctx.fillRect(0, GROUND_Y, canvas.width, canvas.height - GROUND_Y);
+            ctx.fillStyle = '#A0826D';
+            ctx.fillRect(0, GROUND_Y, canvas.width, 3);
+            
+            // Update game
+            if (!gameOver) {
+                player.handleInput(keys);
+                player.update();
+                
+                aiController.update(player);
+                aiPlayer.update();
+                
+                checkCollisions();
+                
+                // Update combo counter
+                if (comboTimer > 0) {
+                    comboTimer--;
+                    if (comboTimer === 0) {
+                        comboCounter = 0;
+                        player.comboCount = 0;
+                        aiPlayer.comboCount = 0;
+                    }
+                }
+                
+                if (player.comboCount > comboCounter || aiPlayer.comboCount > comboCounter) {
+                    comboCounter = Math.max(player.comboCount, aiPlayer.comboCount);
+                    comboTimer = 60;
+                }
+                
+                // Check win
+                if (player.health <= 0 || aiPlayer.health <= 0) {
+                    gameOver = true;
+                    winner = player.health > 0 ? 'PLAYER 1' : 'CPU';
+                }
+            }
+            
+            // Draw fighters
+            player.draw();
+            aiPlayer.draw();
+            
+            // Draw combo counter
+            if (comboCounter > 1) {
+                const comboDisplay = document.getElementById('comboDisplay');
+                comboDisplay.textContent = `${comboCounter} HIT COMBO!`;
+                comboDisplay.style.opacity = '1';
+            } else {
+                document.getElementById('comboDisplay').style.opacity = '0';
+            }
+            
+            // Draw timer
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 32px monospace';
+            ctx.textAlign = 'center';
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 3;
+            ctx.strokeText('99', canvas.width / 2, 50);
+            ctx.fillText('99', canvas.width / 2, 50);
+            ctx.textAlign = 'left';
+            
+            // Game over
+            if (gameOver) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 64px monospace';
+                ctx.textAlign = 'center';
+                ctx.strokeStyle = '#ff0000';
+                ctx.lineWidth = 4;
+                ctx.strokeText(winner + ' WINS!', canvas.width / 2, canvas.height / 2);
+                ctx.fillText(winner + ' WINS!', canvas.width / 2, canvas.height / 2);
+                
+                ctx.font = '24px monospace';
+                ctx.fillText('Press ESC to play again', canvas.width / 2, canvas.height / 2 + 80);
+                ctx.textAlign = 'left';
+            }
+            
+            ctx.restore();
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // Start game
+        gameLoop();
+    </script>
+</body>
+</html>
