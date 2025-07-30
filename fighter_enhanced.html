@@ -24,11 +24,10 @@
             border: 4px solid #222;
             box-shadow: 0 0 40px rgba(0,0,0,0.8), inset 0 0 20px rgba(0,0,0,0.5);
             background: #000;
-            display: block;
         }
         .controls {
-            position: fixed;
-            bottom: 10px;
+            position: absolute;
+            bottom: -50px;
             left: 50%;
             transform: translateX(-50%);
             color: #fff;
@@ -39,7 +38,6 @@
             border-radius: 10px;
             border: 1px solid #444;
             text-shadow: 2px 2px 4px #000;
-            z-index: 1000;
         }
         .combo-display {
             position: absolute;
@@ -1118,7 +1116,6 @@
                 this.currentMove = move;
                 this.moveFrame = 0;
                 this.currentMoveHits = 0;  // Reset hit counter for new move
-                this.lastHit = null;  // Reset last hit for new move
                 
                 // Special properties
                 if (move === 'shoryuken') {
@@ -1201,7 +1198,7 @@
                             
                             this.hitboxes.push({
                                 x: this.facing === 1 ? 25 : -25 - reach,
-                                y: this.currentMove.includes('cr') ? -40 : this.currentMove.includes('j') ? -50 : -80,
+                                y: this.currentMove.includes('cr') ? -40 : -80,
                                 width: reach,
                                 height: 25
                             });
@@ -1947,28 +1944,12 @@
         }
 
         // Initialize game
-        let player = new Fighter(250, true);
-        let aiPlayer = new Fighter(710, false);
-        let aiController = new AIController(aiPlayer);
+        const player = new Fighter(250, true);
+        const aiPlayer = new Fighter(710, false);
+        const aiController = new AIController(aiPlayer);
         
         // Input handling
         const keys = {};
-        
-        // Reset game function
-        function resetGame() {
-            player = new Fighter(250, true);
-            aiPlayer = new Fighter(710, false);
-            aiController = new AIController(aiPlayer);
-            gameOver = false;
-            winner = null;
-            hitPause = 0;
-            globalFreeze = 0;
-            screenShake = 0;
-            comboCounter = 0;
-            comboTimer = 0;
-            particles = [];
-            afterImages = [];
-        }
         
         document.addEventListener('keydown', (e) => {
             const key = e.key.toLowerCase();
@@ -1976,7 +1957,7 @@
             
             // Restart game on ESC
             if (key === 'escape' && gameOver) {
-                resetGame();
+                location.reload();
             }
             
             e.preventDefault();
@@ -2015,32 +1996,25 @@
                             hit1.y + hit1.height > hurt2.y) {
                             
                             // Hit confirmed
-                            const moveData = FRAME_DATA[attacker.currentMove];
-                            if (!moveData) {
-                                return;
-                            }
-                            const maxHits = moveData.hits || 1;
-                            
-                            // For single-hit moves, only hit once per move instance
-                            if (maxHits === 1 && attacker.lastHit === attacker.currentMove) {
-                                return;  // Already hit with this move
-                            }
-                            
-                            // For multi-hit moves, check hit limit and spacing
-                            if (maxHits > 1) {
+                            if (attacker.lastHit !== attacker.currentMove + attacker.moveFrame) {
+                                const moveData = FRAME_DATA[attacker.currentMove];
+                                
+                                // Check if we've reached the hit limit for multi-hit moves
+                                const maxHits = moveData.hits || 1;
                                 if (attacker.currentMoveHits >= maxHits) {
-                                    return;  // Already hit max times
+                                    continue;  // Skip this hit if we've reached the limit
                                 }
                                 
-                                // Space out the hits evenly
-                                const framesPerHit = Math.floor(moveData.active / maxHits);
-                                const currentHitFrame = attacker.moveFrame - moveData.startup;
-                                const nextHitFrame = attacker.currentMoveHits * framesPerHit;
-                                
-                                if (currentHitFrame < nextHitFrame) {
-                                    return;  // Too early for next hit
+                                // For multi-hit moves, space out the hits
+                                if (maxHits > 1) {
+                                    const framesPerHit = Math.floor(moveData.active / maxHits);
+                                    const currentHitFrame = attacker.moveFrame - moveData.startup;
+                                    const expectedHitFrame = attacker.currentMoveHits * framesPerHit;
+                                    
+                                    if (currentHitFrame < expectedHitFrame) {
+                                        continue;  // Too early for the next hit
+                                    }
                                 }
-                            }
                                 
                                 if (hitbox.type === 'throw' && defender.throwTechWindow <= 0) {
                                     // Successful throw
@@ -2061,13 +2035,8 @@
                                     );
                                 }
                                 
-                                // Track the hit - for single-hit moves, just track the move name
-                                if (maxHits === 1) {
-                                    attacker.lastHit = attacker.currentMove;
-                                } else {
-                                    // For multi-hit moves, track which hit we're on
-                                    attacker.currentMoveHits++;
-                                }
+                                attacker.lastHit = attacker.currentMove + attacker.moveFrame;
+                                attacker.currentMoveHits++;  // Increment hit counter
                                 
                                 // Build super meter
                                 attacker.superMeter = Math.min(attacker.maxSuper, 
