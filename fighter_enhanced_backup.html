@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Street Fighter II - Enhanced Graphics</title>
     <style>
         body {
@@ -58,148 +58,6 @@
         .combo-display.active {
             animation: pulse 0.3s ease-in-out;
         }
-        
-        /* Force landscape on mobile */
-        @media screen and (max-width: 768px) and (orientation: portrait) {
-            body::before {
-                content: "Please rotate your device to landscape mode";
-                position: fixed;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background: #000;
-                color: #fff;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                z-index: 9999;
-                font-size: 24px;
-                text-align: center;
-                padding: 20px;
-            }
-            
-            #gameContainer {
-                display: none;
-            }
-        }
-        
-        /* Mobile Controls - Overlay Style */
-        .mobile-controls {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            display: none;
-            pointer-events: none;
-            z-index: 1000;
-        }
-        
-        .mobile-controls.show {
-            display: block;
-        }
-        
-        .touch-button {
-            position: absolute;
-            background: rgba(255, 255, 255, 0.1);
-            border: 3px solid rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            color: rgba(255, 255, 255, 0.8);
-            font-weight: bold;
-            font-size: 18px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            pointer-events: auto;
-            user-select: none;
-            -webkit-user-select: none;
-            touch-action: none;
-            transition: none;
-        }
-        
-        .touch-button.active {
-            background: rgba(255, 255, 255, 0.3);
-            border-color: rgba(255, 255, 255, 0.8);
-            transform: scale(0.9);
-        }
-        
-        /* Virtual Joystick */
-        .virtual-joystick {
-            position: absolute;
-            left: 60px;
-            bottom: 60px;
-            width: 150px;
-            height: 150px;
-            pointer-events: auto;
-        }
-        
-        .joystick-base {
-            position: absolute;
-            width: 150px;
-            height: 150px;
-            background: rgba(255, 255, 255, 0.1);
-            border: 3px solid rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            pointer-events: auto;
-            touch-action: none;
-        }
-        
-        .joystick-handle {
-            position: absolute;
-            width: 60px;
-            height: 60px;
-            background: rgba(255, 255, 255, 0.3);
-            border: 2px solid rgba(255, 255, 255, 0.5);
-            border-radius: 50%;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            pointer-events: none;
-            transition: none;
-        }
-        
-        
-        /* Action Buttons */
-        .action-buttons {
-            position: absolute;
-            right: 60px;
-            bottom: 40px;
-            width: 280px;
-            height: 200px;
-            pointer-events: none;
-        }
-        
-        .action-button {
-            width: 70px;
-            height: 70px;
-            font-size: 18px;
-        }
-        
-        /* 6-button layout optimized for mobile */
-        .btn-lp { top: 30px; right: 210px; }
-        .btn-mp { top: 0; right: 120px; }
-        .btn-hp { top: 0; right: 30px; }
-        .btn-lk { bottom: 30px; right: 210px; }
-        .btn-mk { bottom: 0; right: 120px; }
-        .btn-hk { bottom: 0; right: 30px; }
-        
-        @media (max-width: 768px) {
-            .controls {
-                display: none;
-            }
-            
-            #gameContainer {
-                width: 100vw;
-                height: 100vh;
-            }
-            
-            canvas {
-                width: 100% !important;
-                height: 100% !important;
-                object-fit: contain;
-            }
-        }
     </style>
 </head>
 <body>
@@ -209,25 +67,6 @@
         <div class="controls">
             Movement: A/D (walk), S (crouch), W+A/D (jump) | Punch: U/I/O | Kick: J/K/L | Throw: I+K | Block: Hold back<br>
             Hadouken: ↓↘→ + Punch | Shoryuken: →↓↘ + Punch | Tatsumaki: ↓↙← + Kick
-        </div>
-        
-        <!-- Mobile Controls -->
-        <div class="mobile-controls" id="mobileControls">
-            <!-- Virtual Joystick for movement -->
-            <div class="virtual-joystick" id="virtualJoystick">
-                <div class="joystick-base"></div>
-                <div class="joystick-handle" id="joystickHandle"></div>
-            </div>
-            
-            <!-- Action Buttons -->
-            <div class="action-buttons">
-                <div class="touch-button action-button btn-lp" data-key="u">LP</div>
-                <div class="touch-button action-button btn-mp" data-key="i">MP</div>
-                <div class="touch-button action-button btn-hp" data-key="o">HP</div>
-                <div class="touch-button action-button btn-lk" data-key="j">LK</div>
-                <div class="touch-button action-button btn-mk" data-key="k">MK</div>
-                <div class="touch-button action-button btn-hk" data-key="l">HK</div>
-            </div>
         </div>
     </div>
 
@@ -258,397 +97,6 @@
         const JUMP_VELOCITY_X = 5.5;
         const THROW_RANGE = 85;
         const THROW_TECH_WINDOW = 7;
-
-        // Input Manager - handles keyboard, touch, and gamepad inputs
-        class InputManager {
-            constructor() {
-                this.keys = {};
-                this.touches = new Map();
-                this.gamepads = [];
-                this.lastGamepadState = new Map();
-                this.player = null; // Will be set after player is created
-                this.lastDirections = { left: false, right: false, up: false, down: false };
-                
-                // Touch control detection
-                this.isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-                
-                // Initialize
-                this.setupKeyboard();
-                this.setupTouch();
-                this.setupGamepad();
-                
-                // Show mobile controls if on mobile device
-                if (this.isMobile) {
-                    document.getElementById('mobileControls').classList.add('show');
-                }
-            }
-            
-            setPlayer(player) {
-                this.player = player;
-            }
-            
-            setupKeyboard() {
-                document.addEventListener('keydown', (e) => {
-                    const key = e.key.toLowerCase();
-                    this.keys[key] = true;
-                    
-                    // Restart game on ESC
-                    if (key === 'escape' && window.gameOver) {
-                        location.reload();
-                    }
-                    
-                    e.preventDefault();
-                });
-                
-                document.addEventListener('keyup', (e) => {
-                    this.keys[e.key.toLowerCase()] = false;
-                    e.preventDefault();
-                });
-            }
-            
-            setupTouch() {
-                if (!this.isMobile) return;
-                
-                // Virtual Joystick handling
-                const joystick = document.getElementById('virtualJoystick');
-                const joystickHandle = document.getElementById('joystickHandle');
-                let joystickTouch = null;
-                
-                const updateJoystick = (touch) => {
-                    const rect = joystick.getBoundingClientRect();
-                    const centerX = rect.left + rect.width / 2;
-                    const centerY = rect.top + rect.height / 2;
-                    
-                    let deltaX = touch.clientX - centerX;
-                    let deltaY = touch.clientY - centerY;
-                    
-                    // Limit to circle
-                    const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-                    const maxDistance = rect.width / 2 - 30;
-                    
-                    if (distance > maxDistance) {
-                        deltaX = (deltaX / distance) * maxDistance;
-                        deltaY = (deltaY / distance) * maxDistance;
-                    }
-                    
-                    // Update visual position
-                    joystickHandle.style.transform = `translate(calc(-50% + ${deltaX}px), calc(-50% + ${deltaY}px))`;
-                    
-                    // Update input states
-                    const threshold = 30;
-                    this.keys['a'] = deltaX < -threshold;
-                    this.keys['d'] = deltaX > threshold;
-                    this.keys['s'] = deltaY > threshold;
-                    this.keys['w'] = deltaY < -threshold;  // Up for jump
-                };
-                
-                const resetJoystick = () => {
-                    joystickHandle.style.transform = 'translate(-50%, -50%)';
-                    this.keys['a'] = false;
-                    this.keys['d'] = false;
-                    this.keys['s'] = false;
-                    this.keys['w'] = false;
-                };
-                
-                joystick.addEventListener('touchstart', (e) => {
-                    e.preventDefault();
-                    if (!joystickTouch && e.changedTouches.length > 0) {
-                        joystickTouch = e.changedTouches[0].identifier;
-                        updateJoystick(e.changedTouches[0]);
-                    }
-                }, {passive: false});
-                
-                joystick.addEventListener('touchmove', (e) => {
-                    e.preventDefault();
-                    for (let touch of e.changedTouches) {
-                        if (touch.identifier === joystickTouch) {
-                            updateJoystick(touch);
-                        }
-                    }
-                }, {passive: false});
-                
-                joystick.addEventListener('touchend', (e) => {
-                    e.preventDefault();
-                    for (let touch of e.changedTouches) {
-                        if (touch.identifier === joystickTouch) {
-                            joystickTouch = null;
-                            resetJoystick();
-                        }
-                    }
-                }, {passive: false});
-                
-                joystick.addEventListener('touchcancel', (e) => {
-                    e.preventDefault();
-                    joystickTouch = null;
-                    resetJoystick();
-                }, {passive: false});
-                
-                // Regular button handling
-                const handleTouchStart = (e) => {
-                    e.preventDefault();
-                    const button = e.target;
-                    if (button.dataset.key) {
-                        this.keys[button.dataset.key] = true;
-                        button.classList.add('active');
-                        
-                        // Store touch for tracking
-                        for (let touch of e.changedTouches) {
-                            this.touches.set(touch.identifier, button);
-                        }
-                    }
-                };
-                
-                const handleTouchEnd = (e) => {
-                    e.preventDefault();
-                    for (let touch of e.changedTouches) {
-                        const button = this.touches.get(touch.identifier);
-                        if (button && button.dataset.key) {
-                            this.keys[button.dataset.key] = false;
-                            button.classList.remove('active');
-                            this.touches.delete(touch.identifier);
-                        }
-                    }
-                };
-                
-                const handleTouchMove = (e) => {
-                    e.preventDefault();
-                    for (let touch of e.changedTouches) {
-                        const element = document.elementFromPoint(touch.clientX, touch.clientY);
-                        const oldButton = this.touches.get(touch.identifier);
-                        
-                        if (oldButton && element !== oldButton) {
-                            // Moved to different button
-                            if (oldButton.dataset.key) {
-                                this.keys[oldButton.dataset.key] = false;
-                                oldButton.classList.remove('active');
-                            }
-                            
-                            if (element && element.dataset.key) {
-                                this.keys[element.dataset.key] = true;
-                                element.classList.add('active');
-                                this.touches.set(touch.identifier, element);
-                            }
-                        }
-                    }
-                };
-                
-                const mobileControls = document.getElementById('mobileControls');
-                mobileControls.addEventListener('touchstart', handleTouchStart, {passive: false});
-                mobileControls.addEventListener('touchend', handleTouchEnd, {passive: false});
-                mobileControls.addEventListener('touchmove', handleTouchMove, {passive: false});
-                mobileControls.addEventListener('touchcancel', handleTouchEnd, {passive: false});
-            }
-            
-            setupGamepad() {
-                // Check for gamepads on connect/disconnect
-                window.addEventListener('gamepadconnected', (e) => {
-                    console.log('Gamepad connected:', e.gamepad.id);
-                });
-                
-                window.addEventListener('gamepaddisconnected', (e) => {
-                    console.log('Gamepad disconnected:', e.gamepad.id);
-                });
-            }
-            
-            updateGamepads() {
-                // Get current gamepad states
-                this.gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
-                
-                for (let i = 0; i < this.gamepads.length; i++) {
-                    const gamepad = this.gamepads[i];
-                    if (!gamepad) continue;
-                    
-                    const lastState = this.lastGamepadState.get(i) || {};
-                    const currentState = {};
-                    
-                    // D-pad or left stick for movement
-                    const leftX = gamepad.axes[0];
-                    const leftY = gamepad.axes[1];
-                    const deadzone = 0.3;
-                    
-                    // Left stick / D-pad mapping
-                    if (leftX < -deadzone || gamepad.buttons[14]?.pressed) { // Left
-                        this.keys['a'] = true;
-                    } else if (!this.keys['a'] || (!gamepad.buttons[14]?.pressed && lastState.left)) {
-                        this.keys['a'] = false;
-                    }
-                    
-                    if (leftX > deadzone || gamepad.buttons[15]?.pressed) { // Right
-                        this.keys['d'] = true;
-                    } else if (!this.keys['d'] || (!gamepad.buttons[15]?.pressed && lastState.right)) {
-                        this.keys['d'] = false;
-                    }
-                    
-                    if (leftY < -deadzone || gamepad.buttons[12]?.pressed) { // Up
-                        this.keys['w'] = true;
-                    } else if (!this.keys['w'] || (!gamepad.buttons[12]?.pressed && lastState.up)) {
-                        this.keys['w'] = false;
-                    }
-                    
-                    if (leftY > deadzone || gamepad.buttons[13]?.pressed) { // Down
-                        this.keys['s'] = true;
-                    } else if (!this.keys['s'] || (!gamepad.buttons[13]?.pressed && lastState.down)) {
-                        this.keys['s'] = false;
-                    }
-                    
-                    // Button mapping (Xbox/PS5 compatible)
-                    // X/Square = LP, Y/Triangle = MP, RB/R1 = HP
-                    // A/X = LK, B/Circle = MK, RT/R2 = HK
-                    
-                    const buttonMap = {
-                        0: 'j',  // A/X button -> LK
-                        1: 'k',  // B/Circle -> MK
-                        2: 'u',  // X/Square -> LP
-                        3: 'i',  // Y/Triangle -> MP
-                        4: 'o',  // LB/L1 -> HP (alternative)
-                        5: 'o',  // RB/R1 -> HP
-                        6: 'l',  // LT/L2 -> HK (alternative)
-                        7: 'l'   // RT/R2 -> HK
-                    };
-                    
-                    // Update button states
-                    for (let btnIndex in buttonMap) {
-                        const key = buttonMap[btnIndex];
-                        if (gamepad.buttons[btnIndex]?.pressed) {
-                            this.keys[key] = true;
-                        } else if (lastState[`btn${btnIndex}`]) {
-                            this.keys[key] = false;
-                        }
-                        currentState[`btn${btnIndex}`] = gamepad.buttons[btnIndex]?.pressed;
-                    }
-                    
-                    // Store current state
-                    currentState.left = leftX < -deadzone || gamepad.buttons[14]?.pressed;
-                    currentState.right = leftX > deadzone || gamepad.buttons[15]?.pressed;
-                    currentState.up = leftY < -deadzone || gamepad.buttons[12]?.pressed;
-                    currentState.down = leftY > deadzone || gamepad.buttons[13]?.pressed;
-                    
-                    // Track directional changes and add to input buffer for special moves
-                    if (this.player && this.player.inputBuffer) {
-                        const facing = this.player.facing || 1;
-                        let addedDirection = null;
-                        
-                        // Check for directional changes
-                        if (currentState.down && !this.lastDirections.down) {
-                            this.player.inputBuffer.addDirection('2');
-                            addedDirection = '2';
-                        }
-                        if (currentState.up && !this.lastDirections.up) {
-                            this.player.inputBuffer.addDirection('8');
-                            addedDirection = '8';
-                        }
-                        
-                        // Handle left/right based on facing
-                        if (facing === 1) {
-                            if (currentState.left && !this.lastDirections.left) {
-                                this.player.inputBuffer.addDirection('4');
-                                addedDirection = '4';
-                            }
-                            if (currentState.right && !this.lastDirections.right) {
-                                this.player.inputBuffer.addDirection('6');
-                                addedDirection = '6';
-                            }
-                        } else {
-                            // Reversed when facing left
-                            if (currentState.left && !this.lastDirections.left) {
-                                this.player.inputBuffer.addDirection('6');
-                                addedDirection = '6';
-                            }
-                            if (currentState.right && !this.lastDirections.right) {
-                                this.player.inputBuffer.addDirection('4');
-                                addedDirection = '4';
-                            }
-                        }
-                        
-                        // Handle diagonals - always add current diagonal state
-                        if (currentState.down && currentState.right) {
-                            const dir = facing === 1 ? '3' : '1';
-                            // Add direction if it changed or every few frames while holding
-                            if (!this.lastDirections.down || !this.lastDirections.right || 
-                                (this.player.inputBuffer.directions.length === 0 || 
-                                 this.player.inputBuffer.directions[this.player.inputBuffer.directions.length - 1].dir !== dir)) {
-                                this.player.inputBuffer.addDirection(dir);
-                                addedDirection = dir;
-                            }
-                        } else if (currentState.down && currentState.left) {
-                            const dir = facing === 1 ? '1' : '3';
-                            if (!this.lastDirections.down || !this.lastDirections.left ||
-                                (this.player.inputBuffer.directions.length === 0 || 
-                                 this.player.inputBuffer.directions[this.player.inputBuffer.directions.length - 1].dir !== dir)) {
-                                this.player.inputBuffer.addDirection(dir);
-                                addedDirection = dir;
-                            }
-                        } else if (currentState.up && currentState.right) {
-                            const dir = facing === 1 ? '9' : '7';
-                            if (!this.lastDirections.up || !this.lastDirections.right ||
-                                (this.player.inputBuffer.directions.length === 0 || 
-                                 this.player.inputBuffer.directions[this.player.inputBuffer.directions.length - 1].dir !== dir)) {
-                                this.player.inputBuffer.addDirection(dir);
-                                addedDirection = dir;
-                            }
-                        } else if (currentState.up && currentState.left) {
-                            const dir = facing === 1 ? '7' : '9';
-                            if (!this.lastDirections.up || !this.lastDirections.left ||
-                                (this.player.inputBuffer.directions.length === 0 || 
-                                 this.player.inputBuffer.directions[this.player.inputBuffer.directions.length - 1].dir !== dir)) {
-                                this.player.inputBuffer.addDirection(dir);
-                                addedDirection = dir;
-                            }
-                        }
-                        
-                        // Debug logging for gamepad inputs
-                        if (addedDirection && this.player.isPlayer) {
-                            const recentDirs = this.player.inputBuffer.directions
-                                .slice(-6)
-                                .map(d => d.dir)
-                                .join('');
-                            console.log('[GAMEPAD] Input:', addedDirection, '| Buffer:', recentDirs, '| Facing:', facing === 1 ? 'RIGHT' : 'LEFT');
-                            
-                            // Check for special moves and provide helpful feedback
-                            if (recentDirs.includes('236')) {
-                                console.log('[GAMEPAD] ✓ Hadouken motion detected! Now press any PUNCH button (X/Square, Y/Triangle, or RB/R1)');
-                            }
-                            if (recentDirs.includes('623')) {
-                                console.log('[GAMEPAD] ✓ Shoryuken motion detected! Now press any PUNCH button (X/Square, Y/Triangle, or RB/R1)');
-                            }
-                            if (recentDirs.includes('214')) {
-                                console.log('[GAMEPAD] ✓ Tatsumaki motion detected! Now press any KICK button (A/X, B/Circle, or RT/R2)');
-                            }
-                            
-                            // Help user understand the motions
-                            if (recentDirs.includes('241')) {
-                                console.log('[GAMEPAD] Tip: You did quarter-circle BACK. For Hadouken, do quarter-circle FORWARD (down, down-forward, forward)');
-                            }
-                            if (recentDirs.includes('263')) {
-                                console.log('[GAMEPAD] Tip: You did quarter-circle FORWARD. For Tatsumaki, do quarter-circle BACK (down, down-back, back)');
-                            }
-                        }
-                        
-                        // Update last directions
-                        this.lastDirections = {
-                            left: currentState.left,
-                            right: currentState.right,
-                            up: currentState.up,
-                            down: currentState.down
-                        };
-                    }
-                    
-                    this.lastGamepadState.set(i, currentState);
-                }
-            }
-            
-            getKeys() {
-                // Update gamepad states
-                this.updateGamepads();
-                
-                // Return combined input state
-                return this.keys;
-            }
-            
-            isPressed(key) {
-                return this.keys[key] || false;
-            }
-        }
 
         // Particle system
         class Particle {
@@ -1488,34 +936,30 @@
                 }
             }
 
+            // Include all the original Fighter methods here...
             handleInput(keys) {
+                // [Previous handleInput logic remains the same]
                 // Update directional inputs for special moves
-                // Skip if gamepad is active (gamepad handles its own directional inputs)
-                const gamepadActive = navigator.getGamepads && 
-                    Array.from(navigator.getGamepads()).some(gp => gp && gp.connected);
-                
-                if (!gamepadActive) {
-                    const dirs = [];
-                    if (keys['s']) dirs.push('2');
-                    if (keys['w']) dirs.push('8');
-                    if (this.facing === 1) {
-                        if (keys['a']) dirs.push('4');
-                        if (keys['d']) dirs.push('6');
-                    } else {
-                        if (keys['a']) dirs.push('6');
-                        if (keys['d']) dirs.push('4');
-                    }
-                    
-                    if (dirs.length === 0) dirs.push('5'); // Neutral
-                    
-                    // Add to input buffer
-                    dirs.forEach(dir => {
-                        if (!this.inputBuffer.directions.length || 
-                            this.inputBuffer.directions[this.inputBuffer.directions.length - 1].dir !== dir) {
-                            this.inputBuffer.addDirection(dir);
-                        }
-                    });
+                const dirs = [];
+                if (keys['s']) dirs.push('2');
+                if (keys['w']) dirs.push('8');
+                if (this.facing === 1) {
+                    if (keys['a']) dirs.push('4');
+                    if (keys['d']) dirs.push('6');
+                } else {
+                    if (keys['a']) dirs.push('6');
+                    if (keys['d']) dirs.push('4');
                 }
+                
+                if (dirs.length === 0) dirs.push('5'); // Neutral
+                
+                // Add to input buffer
+                dirs.forEach(dir => {
+                    if (!this.inputBuffer.directions.length || 
+                        this.inputBuffer.directions[this.inputBuffer.directions.length - 1].dir !== dir) {
+                        this.inputBuffer.addDirection(dir);
+                    }
+                });
                 
                 // Can't act during hitstun/blockstun (but still update facing for proper blocking direction)
                 const inStun = this.hitstunFrames > 0 || this.blockstunFrames > 0 || this.knockdownFrames > 0;
@@ -1627,32 +1071,20 @@
                 
                 // Check for special moves first
                 if (this.state !== 'attack' || (this.currentMove && FRAME_DATA[this.currentMove].cancelable)) {
-                    // Debug: log when punch buttons are pressed
-                    const punchPressed = keys['u'] || keys['i'] || keys['o'];
-                    const kickPressed = keys['j'] || keys['k'] || keys['l'];
-                    
-                    if (this.isPlayer && (punchPressed || kickPressed)) {
-                        console.log('[SPECIAL] Button pressed! Punch:', punchPressed, 'Kick:', kickPressed);
-                        console.log('[SPECIAL] Current buffer:', this.inputBuffer.directions.slice(-8).map(d => d.dir).join(''));
-                    }
-                    
                     // Shoryuken (Dragon Punch motion)
-                    if (this.inputBuffer.checkMotion('623') && punchPressed) {
-                        console.log('[SPECIAL] SHORYUKEN TRIGGERED!');
+                    if (this.inputBuffer.checkMotion('623') && (keys['u'] || keys['i'] || keys['o'])) {
                         this.performSpecialMove('shoryuken');
                         return;
                     }
                     
                     // Hadouken (Quarter Circle Forward)
-                    if (this.inputBuffer.checkMotion('236') && punchPressed) {
-                        console.log('[SPECIAL] HADOUKEN TRIGGERED!');
+                    if (this.inputBuffer.checkMotion('236') && (keys['u'] || keys['i'] || keys['o'])) {
                         this.performSpecialMove('hadouken');
                         return;
                     }
                     
                     // Tatsumaki (Quarter Circle Back)
-                    if (this.inputBuffer.checkMotion('214') && kickPressed) {
-                        console.log('[SPECIAL] TATSUMAKI TRIGGERED!');
+                    if (this.inputBuffer.checkMotion('214') && (keys['j'] || keys['k'] || keys['l'])) {
                         this.performSpecialMove('tatsumaki');
                         return;
                     }
@@ -2524,31 +1956,11 @@
             }
 
             checkMotion(motion) {
-                // Make motion detection more lenient
-                // Check last 10 directions for the pattern (increased from 8)
-                const recent = this.directions.slice(-10);
+                const recent = this.directions.slice(-motion.length);
                 if (recent.length < motion.length) return false;
                 
-                // Join all recent directions
                 const motionStr = recent.map(d => d.dir).join('');
-                
-                // Debug log for player - only log when actually checking (not every frame)
-                console.log('[INPUT] Checking motion:', motion, 'in buffer:', motionStr, '| Recent inputs age:', recent.map(d => d.time));
-                
-                // Check if motion exists anywhere in recent buffer
-                if (motionStr.includes(motion)) {
-                    console.log('[INPUT] Motion matched!', motion);
-                    return true;
-                }
-                
-                // Also check with some leniency - allow skipping neutral (5)
-                const cleanedMotion = motionStr.replace(/5/g, '');
-                if (cleanedMotion.includes(motion)) {
-                    console.log('[INPUT] Motion matched with leniency!', motion);
-                    return true;
-                }
-                
-                return false;
+                return motionStr.includes(motion);
             }
 
             checkButton(btn) {
@@ -2708,16 +2120,29 @@
         }
 
         // Initialize game
-        const inputManager = new InputManager();
         const player = new Fighter(250, true);
         const aiPlayer = new Fighter(710, false);
         const aiController = new AIController(aiPlayer);
         
-        // Set player reference for gamepad special moves
-        inputManager.setPlayer(player);
+        // Input handling
+        const keys = {};
         
-        // Use InputManager for key states
-        const keys = inputManager.getKeys();
+        document.addEventListener('keydown', (e) => {
+            const key = e.key.toLowerCase();
+            keys[key] = true;
+            
+            // Restart game on ESC
+            if (key === 'escape' && gameOver) {
+                location.reload();
+            }
+            
+            e.preventDefault();
+        });
+        
+        document.addEventListener('keyup', (e) => {
+            keys[e.key.toLowerCase()] = false;
+            e.preventDefault();
+        });
 
         // Collision detection (remains the same)
         function checkCollisions() {
@@ -2848,7 +2273,7 @@
         }
 
         // Main game loop
-        window.gameOver = false;
+        let gameOver = false;
         let winner = null;
         
         function gameLoop() {
@@ -2878,10 +2303,8 @@
             drawBackground();
             
             // Update game state
-            if (!window.gameOver) {
-                // Get fresh input state each frame
-                const currentKeys = inputManager.getKeys();
-                player.handleInput(currentKeys);
+            if (!gameOver) {
+                player.handleInput(keys);
                 player.update();
                 
                 aiController.update(player);
@@ -2912,7 +2335,7 @@
                 
                 // Check win conditions
                 if (player.health <= 0 || aiPlayer.health <= 0) {
-                    window.gameOver = true;
+                    gameOver = true;
                     winner = player.health > 0 ? 'PLAYER 1' : 'CPU';
                 }
             }
@@ -2966,7 +2389,7 @@
             ctx.textAlign = 'left';
             
             // Game over screen
-            if (window.gameOver) {
+            if (gameOver) {
                 // Darken screen
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
