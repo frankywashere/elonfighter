@@ -1564,9 +1564,11 @@
                 const hasActiveThreat = (opponentHasActiveHitbox && distance < 200) || hasIncomingProjectile;
                 
                 // You're in blocking stance if:
-                // 1. Holding back AND (close to opponent OR active threat exists)
-                // This allows walking backwards when far away with no threats
-                this.blocking = holdingBack && !this.isDizzy && (inBlockRange || hasActiveThreat);
+                // 1. Holding back AND there's an active threat
+                // 2. If no threat, only block if VERY close (< 80 units) to allow for walk-back at medium range
+                // This prevents getting stuck in block when trying to create space
+                const veryClose = distance < 80;
+                this.blocking = holdingBack && !this.isDizzy && (hasActiveThreat || (veryClose && opponent.state === 'attack'));
                 
                 // Debug logging for player - log every frame to catch the stuck state
                 if (this.isPlayer) {
@@ -2518,15 +2520,15 @@
                 this.directions.forEach(d => d.time++);
                 this.buttons.forEach(b => b.time++);
                 
-                // Remove old inputs
-                this.directions = this.directions.filter(d => d.time < 30);
-                this.buttons = this.buttons.filter(b => b.time < 10);
+                // Remove old inputs - increased window for gamepad
+                this.directions = this.directions.filter(d => d.time < 45); // Increased from 30
+                this.buttons = this.buttons.filter(b => b.time < 15); // Increased from 10
             }
 
             checkMotion(motion) {
                 // Make motion detection more lenient
-                // Check last 10 directions for the pattern (increased from 8)
-                const recent = this.directions.slice(-10);
+                // Check last 12 directions for the pattern (increased for gamepad)
+                const recent = this.directions.slice(-12);
                 if (recent.length < motion.length) return false;
                 
                 // Join all recent directions
@@ -2546,6 +2548,29 @@
                 if (cleanedMotion.includes(motion)) {
                     console.log('[INPUT] Motion matched with leniency!', motion);
                     return true;
+                }
+                
+                // Additional leniency for gamepad - allow intermediate directions
+                // For Hadouken (236), also accept 2356, 2536, etc.
+                // For Shoryuken (623), also accept 6523, 6235, etc.
+                if (motion === '236') {
+                    // Quarter circle forward - accept variations
+                    if (motionStr.match(/2[35]?[56]?6/) || cleanedMotion.match(/2[35]?6/)) {
+                        console.log('[INPUT] Hadouken motion matched with gamepad leniency!');
+                        return true;
+                    }
+                } else if (motion === '623') {
+                    // Dragon punch - accept variations
+                    if (motionStr.match(/6[25]?2[35]?3/) || cleanedMotion.match(/62[35]?/)) {
+                        console.log('[INPUT] Shoryuken motion matched with gamepad leniency!');
+                        return true;
+                    }
+                } else if (motion === '214') {
+                    // Quarter circle back - accept variations
+                    if (motionStr.match(/2[15]?[45]?4/) || cleanedMotion.match(/2[15]?4/)) {
+                        console.log('[INPUT] Tatsumaki motion matched with gamepad leniency!');
+                        return true;
+                    }
                 }
                 
                 return false;
