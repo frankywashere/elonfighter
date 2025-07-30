@@ -1969,6 +1969,13 @@
                     this.moveFrame++;
                     const frameData = FRAME_DATA[this.currentMove];
                     
+                    // Check if frameData exists (move might have been removed)
+                    if (!frameData) {
+                        console.error(`[FIGHTER] Invalid move: ${this.currentMove} not found in FRAME_DATA`);
+                        this.endAttack();
+                        return;
+                    }
+                    
                     // Spawn projectile for hadouken
                     if (this.currentMove === 'hadouken' && this.moveFrame === frameData.startup) {
                         this.projectiles.push(new Projectile(
@@ -2658,14 +2665,14 @@
                         this.fighter.attack('LP');
                         this.reactionTimer = 15;
                     } else if (r < 0.3) {
-                        this.fighter.attack('closeMP');
+                        this.fighter.attack('closeHP');  // Changed from closeMP
                         this.reactionTimer = 20;
                     } else if (r < 0.4) {
                         this.fighter.attemptThrow();
                         this.reactionTimer = 30;
                     } else if (r < 0.5) {
                         this.fighter.crouch();
-                        this.fighter.attack('crMK');
+                        this.fighter.attack('crLK');  // Changed from crMK
                         this.reactionTimer = 25;
                     } else if (r < 0.6) {
                         // Dragon punch
@@ -2678,7 +2685,7 @@
                 } else {
                     // Mid range
                     if (Math.random() < 0.3) {
-                        this.fighter.attack('MK');
+                        this.fighter.attack('HK');  // Changed from MK
                         this.reactionTimer = 25;
                     } else if (Math.random() < 0.1) {
                         this.fighter.crouch();
