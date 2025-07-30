@@ -1945,21 +1945,22 @@
         }
 
         // Initialize game
-        const player = new Fighter(250, true);
-        const aiPlayer = new Fighter(710, false);
-        const aiController = new AIController(aiPlayer);
+        let player = new Fighter(250, true);
+        let aiPlayer = new Fighter(710, false);
+        let aiController = new AIController(aiPlayer);
         
         // Input handling
         const keys = {};
         
         // Reset game function
         function resetGame() {
-            player = new Fighter(200, true);
-            aiPlayer = new Fighter(600, false);
-            ai = new AI(aiPlayer);
+            player = new Fighter(250, true);
+            aiPlayer = new Fighter(710, false);
+            aiController = new AIController(aiPlayer);
             gameOver = false;
             winner = null;
-            hitStop = 0;
+            hitPause = 0;
+            globalFreeze = 0;
             screenShake = 0;
             comboCounter = 0;
             comboTimer = 0;
