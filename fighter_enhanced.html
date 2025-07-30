@@ -1393,7 +1393,8 @@
 
             takeDamage(damage, hitstun, blockstun, pushback, knockdown = false, attacker = null) {
                 // Check blocking at the moment of impact
-                const isLowAttack = FRAME_DATA[attacker?.currentMove]?.low;
+                const isLowAttack = attacker?.currentMove && FRAME_DATA[attacker.currentMove]?.low;
+                
                 
                 // Blocking logic:
                 // - Crouch block blocks EVERYTHING
@@ -1436,6 +1437,36 @@
                     this.health -= chipDamage;
                     this.blockstunFrames = blockstun;
                     this.pushbackVelocity = -this.facing * pushback * 0.6;
+                    
+                    // Debug: Show "BLOCK DETECTED" text
+                    particles.push({
+                        x: this.x,
+                        y: this.y - 150,
+                        life: 60,
+                        type: 'blockText',
+                        text: 'BLOCK DETECTED',
+                        scale: 1,
+                        update() {
+                            this.life--;
+                            if (this.life > 50) {
+                                this.scale = Math.min(1.5, this.scale + 0.1);
+                            } else if (this.life < 10) {
+                                this.scale *= 0.9;
+                            }
+                        },
+                        draw() {
+                            ctx.save();
+                            ctx.globalAlpha = Math.min(1, this.life / 10);
+                            ctx.font = `bold ${20 * this.scale}px Arial`;
+                            ctx.fillStyle = '#00ff00';
+                            ctx.strokeStyle = '#000';
+                            ctx.lineWidth = 3;
+                            ctx.textAlign = 'center';
+                            ctx.strokeText(this.text, this.x, this.y);
+                            ctx.fillText(this.text, this.x, this.y);
+                            ctx.restore();
+                        }
+                    });
                     
                     // Show chip damage number
                     if (chipDamage > 0) {
@@ -1722,10 +1753,10 @@
             jMK: { startup: 7, active: 8, recovery: 0, damage: 5, hitstun: 18, blockstun: 16, pushback: 2 },
             jHK: { startup: 9, active: 6, recovery: 0, damage: 7, hitstun: 22, blockstun: 20, pushback: 3 },
             
-            // Special moves
-            hadouken: { startup: 13, active: 40, recovery: 40, damage: 8, hitstun: 20, blockstun: 16, pushback: 3, projectile: true },
-            shoryuken: { startup: 3, active: 14, recovery: 43, damage: 12, hitstun: 30, blockstun: 0, pushback: 5, invincible: 8, knockdown: true },
-            tatsumaki: { startup: 11, active: 24, recovery: 18, damage: 4, hitstun: 18, blockstun: 16, pushback: 4, hits: 3 },
+            // Special moves - REDUCED DAMAGE
+            hadouken: { startup: 13, active: 40, recovery: 40, damage: 5, hitstun: 20, blockstun: 16, pushback: 3, projectile: true },
+            shoryuken: { startup: 3, active: 14, recovery: 43, damage: 8, hitstun: 30, blockstun: 0, pushback: 5, invincible: 8, knockdown: true },
+            tatsumaki: { startup: 11, active: 24, recovery: 18, damage: 3, hitstun: 18, blockstun: 16, pushback: 4, hits: 3 },
             
             // Throw
             throw: { startup: 3, active: 2, recovery: 24, damage: 12, range: THROW_RANGE }
