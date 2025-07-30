@@ -2003,8 +2003,23 @@
                     this.velocityY += GRAVITY;
                 }
                 
+                // Track position for debugging teleport issues
+                const oldX = this.x;
+                const oldY = this.y;
+                
                 this.y += this.velocityY;
                 this.x += this.velocityX + this.pushbackVelocity;
+                
+                // Debug large position changes
+                if (this.isPlayer && (Math.abs(this.x - oldX) > 50 || Math.abs(this.y - oldY) > 50)) {
+                    console.log('[PLAYER] Large position change detected!', {
+                        oldPos: {x: oldX, y: oldY},
+                        newPos: {x: this.x, y: this.y},
+                        state: this.state,
+                        move: this.currentMove,
+                        velocities: {x: this.velocityX, y: this.velocityY, pushback: this.pushbackVelocity}
+                    });
+                }
                 
                 // Ground collision
                 if (this.y >= GROUND_Y) {
@@ -2031,8 +2046,21 @@
                 }
                 this.pushbackVelocity *= 0.9;
                 
-                // Bounds
-                this.x = Math.max(50, Math.min(canvas.width - 50, this.x));
+                // Bounds - smooth clamping to prevent teleporting
+                const margin = 50;
+                const oldBoundedX = this.x;
+                if (this.x < margin) {
+                    this.x = margin;
+                    this.velocityX = Math.max(0, this.velocityX); // Stop leftward movement
+                } else if (this.x > canvas.width - margin) {
+                    this.x = canvas.width - margin;
+                    this.velocityX = Math.min(0, this.velocityX); // Stop rightward movement
+                }
+                
+                // Debug if bounds caused a large change
+                if (this.isPlayer && Math.abs(this.x - oldBoundedX) > 30) {
+                    console.log('[PLAYER] Bounds correction:', {from: oldBoundedX, to: this.x});
+                }
                 
                 // Facing is now updated in handleInput for better cross-up handling
                 
