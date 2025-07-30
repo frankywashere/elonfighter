@@ -1003,12 +1003,15 @@
                 this.blocking = shouldBlock;
                 
                 // Debug logging for player
-                if (this.isPlayer && shouldBlock) {
-                    console.log('[PLAYER] Blocking state:', {
+                if (this.isPlayer) {
+                    console.log('[PLAYER] handleInput blocking check:', {
+                        blocking: this.blocking,
+                        shouldBlock: shouldBlock,
                         holdingBack: holdingBack,
                         opponentHasActiveHitbox: opponentHasActiveHitbox,
                         distance: distance,
-                        hasIncomingProjectile: hasIncomingProjectile
+                        hasIncomingProjectile: hasIncomingProjectile,
+                        state: this.state
                     });
                 }
                 
@@ -1062,13 +1065,20 @@
                 
                 // Movement
                 if (this.state !== 'attack') {
-                    // Walking - always allow movement unless in attack state
-                    if (keys['a'] && !this.crouching) {
-                        this.walk(-1); // Always move left with A
-                    } else if (keys['d'] && !this.crouching) {
-                        this.walk(1);  // Always move right with D
-                    } else if (this.grounded && Math.abs(this.velocityX) < 0.5) {
-                        this.state = this.crouching ? 'crouch' : 'idle';
+                    // Walking - don't walk when blocking
+                    if (!this.blocking) {
+                        if (keys['a'] && !this.crouching) {
+                            this.walk(-1); // Always move left with A
+                        } else if (keys['d'] && !this.crouching) {
+                            this.walk(1);  // Always move right with D
+                        } else if (this.grounded && Math.abs(this.velocityX) < 0.5) {
+                            this.state = this.crouching ? 'crouch' : 'idle';
+                        }
+                    } else {
+                        // When blocking, set appropriate state but don't walk
+                        if (this.grounded && Math.abs(this.velocityX) < 0.5) {
+                            this.state = this.crouching ? 'crouch' : 'idle';
+                        }
                     }
                     
                     // Crouching (only update if not blocking)
@@ -1131,6 +1141,15 @@
                     const speed = direction === this.facing ? WALK_SPEED_FORWARD : WALK_SPEED_BACKWARD;
                     this.velocityX = direction * speed;
                     this.state = 'walk';
+                    
+                    // Debug log for player
+                    if (this.isPlayer) {
+                        console.log('[PLAYER] Walking:', {
+                            direction: direction,
+                            blocking: this.blocking,
+                            state: this.state
+                        });
+                    }
                 }
             }
 
@@ -1455,7 +1474,10 @@
                     blocking: this.blocking,
                     crouching: this.crouching,
                     grounded: this.grounded,
-                    isLowAttack: isLowAttack
+                    isLowAttack: isLowAttack,
+                    state: this.state,
+                    hitstun: this.hitstunFrames,
+                    blockstun: this.blockstunFrames
                 });
                 
                 // Blocking logic:
