@@ -1008,7 +1008,7 @@
                 
                 // Visual feedback for blocking type
                 if (this.blocking) {
-                    this.blockType = holdingDown ? 'low' : 'high';
+                    this.blockType = this.crouching ? 'low' : 'high';
                 } else {
                     this.blockType = null;
                 }
@@ -1025,13 +1025,11 @@
                         this.state = this.crouching ? 'crouch' : 'idle';
                     }
                     
-                    // Crouching (only update if not blocking)
-                    if (!this.blocking) {
-                        if (keys['s']) {
-                            this.crouch();
-                        } else {
-                            this.crouching = false;
-                        }
+                    // Crouching - always allow crouching even while blocking
+                    if (keys['s']) {
+                        this.crouch();
+                    } else {
+                        this.crouching = false;
                     }
                     
                     // Jumping - SF2 style with directional jumps
@@ -1395,6 +1393,8 @@
                 // Check blocking at the moment of impact
                 const isLowAttack = attacker?.currentMove && FRAME_DATA[attacker.currentMove]?.low;
                 
+                // Debug info
+                console.log(`Taking damage - Blocking: ${this.blocking}, Crouching: ${this.crouching}, Attack: ${attacker?.currentMove}, IsLow: ${isLowAttack}`);
                 
                 // Blocking logic:
                 // - Crouch block blocks EVERYTHING
