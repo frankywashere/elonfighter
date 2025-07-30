@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Street Fighter II - Enhanced Graphics</title>
     <style>
         body {
@@ -58,6 +58,149 @@
         .combo-display.active {
             animation: pulse 0.3s ease-in-out;
         }
+        
+        /* Mobile Controls */
+        .mobile-controls {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 200px;
+            display: none;
+            pointer-events: none;
+            z-index: 1000;
+        }
+        
+        .mobile-controls.show {
+            display: block;
+        }
+        
+        .touch-button {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-radius: 10px;
+            color: white;
+            font-weight: bold;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: auto;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+        
+        .touch-button.active {
+            background: rgba(255, 255, 255, 0.4);
+            border-color: rgba(255, 255, 255, 0.8);
+            transform: scale(0.95);
+        }
+        
+        .dpad {
+            position: absolute;
+            left: 20px;
+            bottom: 20px;
+            width: 150px;
+            height: 150px;
+            pointer-events: auto;
+        }
+        
+        .dpad-button {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            pointer-events: auto;
+            touch-action: none;
+        }
+        
+        .dpad-button.active {
+            background: rgba(255, 255, 255, 0.4);
+            border-color: rgba(255, 255, 255, 0.8);
+        }
+        
+        .dpad-up {
+            top: 0;
+            left: 50px;
+            width: 50px;
+            height: 50px;
+            border-radius: 10px 10px 0 0;
+        }
+        
+        .dpad-down {
+            bottom: 0;
+            left: 50px;
+            width: 50px;
+            height: 50px;
+            border-radius: 0 0 10px 10px;
+        }
+        
+        .dpad-left {
+            left: 0;
+            top: 50px;
+            width: 50px;
+            height: 50px;
+            border-radius: 10px 0 0 10px;
+        }
+        
+        .dpad-right {
+            right: 0;
+            top: 50px;
+            width: 50px;
+            height: 50px;
+            border-radius: 0 10px 10px 0;
+        }
+        
+        .dpad-center {
+            top: 50px;
+            left: 50px;
+            width: 50px;
+            height: 50px;
+            background: rgba(0, 0, 0, 0.3);
+            border: none;
+            pointer-events: none;
+        }
+        
+        .action-buttons {
+            position: absolute;
+            right: 20px;
+            bottom: 20px;
+            width: 200px;
+            height: 150px;
+            pointer-events: none;
+        }
+        
+        .action-button {
+            width: 55px;
+            height: 55px;
+            font-size: 16px;
+        }
+        
+        /* 6-button layout like arcade */
+        .btn-lp { top: 20px; left: 0; }
+        .btn-mp { top: 20px; left: 70px; }
+        .btn-hp { top: 20px; left: 140px; }
+        .btn-lk { top: 85px; left: 0; }
+        .btn-mk { top: 85px; left: 70px; }
+        .btn-hk { top: 85px; left: 140px; }
+        
+        @media (max-width: 768px) {
+            .controls {
+                display: none;
+            }
+            
+            #gameContainer {
+                width: 100vw;
+                height: calc(100vh - 200px);
+            }
+            
+            canvas {
+                width: 100% !important;
+                height: 100% !important;
+                object-fit: contain;
+            }
+        }
     </style>
 </head>
 <body>
@@ -67,6 +210,25 @@
         <div class="controls">
             Movement: A/D (walk), S (crouch), W+A/D (jump) | Punch: U/I/O | Kick: J/K/L | Throw: I+K | Block: Hold back<br>
             Hadouken: ↓↘→ + Punch | Shoryuken: →↓↘ + Punch | Tatsumaki: ↓↙← + Kick
+        </div>
+        
+        <!-- Mobile Controls -->
+        <div class="mobile-controls" id="mobileControls">
+            <div class="dpad">
+                <div class="dpad-button dpad-up" data-key="w"></div>
+                <div class="dpad-button dpad-down" data-key="s"></div>
+                <div class="dpad-button dpad-left" data-key="a"></div>
+                <div class="dpad-button dpad-right" data-key="d"></div>
+                <div class="dpad-center"></div>
+            </div>
+            <div class="action-buttons">
+                <div class="touch-button action-button btn-lp" data-key="u">LP</div>
+                <div class="touch-button action-button btn-mp" data-key="i">MP</div>
+                <div class="touch-button action-button btn-hp" data-key="o">HP</div>
+                <div class="touch-button action-button btn-lk" data-key="j">LK</div>
+                <div class="touch-button action-button btn-mk" data-key="k">MK</div>
+                <div class="touch-button action-button btn-hk" data-key="l">HK</div>
+            </div>
         </div>
     </div>
 
@@ -97,6 +259,207 @@
         const JUMP_VELOCITY_X = 5.5;
         const THROW_RANGE = 85;
         const THROW_TECH_WINDOW = 7;
+
+        // Input Manager - handles keyboard, touch, and gamepad inputs
+        class InputManager {
+            constructor() {
+                this.keys = {};
+                this.touches = new Map();
+                this.gamepads = [];
+                this.lastGamepadState = new Map();
+                
+                // Touch control detection
+                this.isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+                this.isSmallScreen = window.innerWidth <= 768;
+                
+                // Initialize
+                this.setupKeyboard();
+                this.setupTouch();
+                this.setupGamepad();
+                
+                // Show mobile controls if needed
+                if (this.isMobile && this.isSmallScreen) {
+                    document.getElementById('mobileControls').classList.add('show');
+                }
+            }
+            
+            setupKeyboard() {
+                document.addEventListener('keydown', (e) => {
+                    const key = e.key.toLowerCase();
+                    this.keys[key] = true;
+                    
+                    // Restart game on ESC
+                    if (key === 'escape' && window.gameOver) {
+                        location.reload();
+                    }
+                    
+                    e.preventDefault();
+                });
+                
+                document.addEventListener('keyup', (e) => {
+                    this.keys[e.key.toLowerCase()] = false;
+                    e.preventDefault();
+                });
+            }
+            
+            setupTouch() {
+                if (!this.isMobile) return;
+                
+                const handleTouchStart = (e) => {
+                    e.preventDefault();
+                    const button = e.target;
+                    if (button.dataset.key) {
+                        this.keys[button.dataset.key] = true;
+                        button.classList.add('active');
+                        
+                        // Store touch for tracking
+                        for (let touch of e.changedTouches) {
+                            this.touches.set(touch.identifier, button);
+                        }
+                    }
+                };
+                
+                const handleTouchEnd = (e) => {
+                    e.preventDefault();
+                    for (let touch of e.changedTouches) {
+                        const button = this.touches.get(touch.identifier);
+                        if (button && button.dataset.key) {
+                            this.keys[button.dataset.key] = false;
+                            button.classList.remove('active');
+                            this.touches.delete(touch.identifier);
+                        }
+                    }
+                };
+                
+                const handleTouchMove = (e) => {
+                    e.preventDefault();
+                    for (let touch of e.changedTouches) {
+                        const element = document.elementFromPoint(touch.clientX, touch.clientY);
+                        const oldButton = this.touches.get(touch.identifier);
+                        
+                        if (oldButton && element !== oldButton) {
+                            // Moved to different button
+                            if (oldButton.dataset.key) {
+                                this.keys[oldButton.dataset.key] = false;
+                                oldButton.classList.remove('active');
+                            }
+                            
+                            if (element && element.dataset.key) {
+                                this.keys[element.dataset.key] = true;
+                                element.classList.add('active');
+                                this.touches.set(touch.identifier, element);
+                            }
+                        }
+                    }
+                };
+                
+                const mobileControls = document.getElementById('mobileControls');
+                mobileControls.addEventListener('touchstart', handleTouchStart, {passive: false});
+                mobileControls.addEventListener('touchend', handleTouchEnd, {passive: false});
+                mobileControls.addEventListener('touchmove', handleTouchMove, {passive: false});
+                mobileControls.addEventListener('touchcancel', handleTouchEnd, {passive: false});
+            }
+            
+            setupGamepad() {
+                // Check for gamepads on connect/disconnect
+                window.addEventListener('gamepadconnected', (e) => {
+                    console.log('Gamepad connected:', e.gamepad.id);
+                });
+                
+                window.addEventListener('gamepaddisconnected', (e) => {
+                    console.log('Gamepad disconnected:', e.gamepad.id);
+                });
+            }
+            
+            updateGamepads() {
+                // Get current gamepad states
+                this.gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+                
+                for (let i = 0; i < this.gamepads.length; i++) {
+                    const gamepad = this.gamepads[i];
+                    if (!gamepad) continue;
+                    
+                    const lastState = this.lastGamepadState.get(i) || {};
+                    const currentState = {};
+                    
+                    // D-pad or left stick for movement
+                    const leftX = gamepad.axes[0];
+                    const leftY = gamepad.axes[1];
+                    const deadzone = 0.3;
+                    
+                    // Left stick / D-pad mapping
+                    if (leftX < -deadzone || gamepad.buttons[14]?.pressed) { // Left
+                        this.keys['a'] = true;
+                    } else if (!this.keys['a'] || (!gamepad.buttons[14]?.pressed && lastState.left)) {
+                        this.keys['a'] = false;
+                    }
+                    
+                    if (leftX > deadzone || gamepad.buttons[15]?.pressed) { // Right
+                        this.keys['d'] = true;
+                    } else if (!this.keys['d'] || (!gamepad.buttons[15]?.pressed && lastState.right)) {
+                        this.keys['d'] = false;
+                    }
+                    
+                    if (leftY < -deadzone || gamepad.buttons[12]?.pressed) { // Up
+                        this.keys['w'] = true;
+                    } else if (!this.keys['w'] || (!gamepad.buttons[12]?.pressed && lastState.up)) {
+                        this.keys['w'] = false;
+                    }
+                    
+                    if (leftY > deadzone || gamepad.buttons[13]?.pressed) { // Down
+                        this.keys['s'] = true;
+                    } else if (!this.keys['s'] || (!gamepad.buttons[13]?.pressed && lastState.down)) {
+                        this.keys['s'] = false;
+                    }
+                    
+                    // Button mapping (Xbox/PS5 compatible)
+                    // X/Square = LP, Y/Triangle = MP, RB/R1 = HP
+                    // A/X = LK, B/Circle = MK, RT/R2 = HK
+                    
+                    const buttonMap = {
+                        0: 'j',  // A/X button -> LK
+                        1: 'k',  // B/Circle -> MK
+                        2: 'u',  // X/Square -> LP
+                        3: 'i',  // Y/Triangle -> MP
+                        4: 'o',  // LB/L1 -> HP (alternative)
+                        5: 'o',  // RB/R1 -> HP
+                        6: 'l',  // LT/L2 -> HK (alternative)
+                        7: 'l'   // RT/R2 -> HK
+                    };
+                    
+                    // Update button states
+                    for (let btnIndex in buttonMap) {
+                        const key = buttonMap[btnIndex];
+                        if (gamepad.buttons[btnIndex]?.pressed) {
+                            this.keys[key] = true;
+                        } else if (lastState[`btn${btnIndex}`]) {
+                            this.keys[key] = false;
+                        }
+                        currentState[`btn${btnIndex}`] = gamepad.buttons[btnIndex]?.pressed;
+                    }
+                    
+                    // Store current state
+                    currentState.left = leftX < -deadzone || gamepad.buttons[14]?.pressed;
+                    currentState.right = leftX > deadzone || gamepad.buttons[15]?.pressed;
+                    currentState.up = leftY < -deadzone || gamepad.buttons[12]?.pressed;
+                    currentState.down = leftY > deadzone || gamepad.buttons[13]?.pressed;
+                    
+                    this.lastGamepadState.set(i, currentState);
+                }
+            }
+            
+            getKeys() {
+                // Update gamepad states
+                this.updateGamepads();
+                
+                // Return combined input state
+                return this.keys;
+            }
+            
+            isPressed(key) {
+                return this.keys[key] || false;
+            }
+        }
 
         // Particle system
         class Particle {
@@ -936,9 +1299,7 @@
                 }
             }
 
-            // Include all the original Fighter methods here...
             handleInput(keys) {
-                // [Previous handleInput logic remains the same]
                 // Update directional inputs for special moves
                 const dirs = [];
                 if (keys['s']) dirs.push('2');
@@ -2120,29 +2481,13 @@
         }
 
         // Initialize game
+        const inputManager = new InputManager();
         const player = new Fighter(250, true);
         const aiPlayer = new Fighter(710, false);
         const aiController = new AIController(aiPlayer);
         
-        // Input handling
-        const keys = {};
-        
-        document.addEventListener('keydown', (e) => {
-            const key = e.key.toLowerCase();
-            keys[key] = true;
-            
-            // Restart game on ESC
-            if (key === 'escape' && gameOver) {
-                location.reload();
-            }
-            
-            e.preventDefault();
-        });
-        
-        document.addEventListener('keyup', (e) => {
-            keys[e.key.toLowerCase()] = false;
-            e.preventDefault();
-        });
+        // Use InputManager for key states
+        const keys = inputManager.getKeys();
 
         // Collision detection (remains the same)
         function checkCollisions() {
@@ -2273,7 +2618,7 @@
         }
 
         // Main game loop
-        let gameOver = false;
+        window.gameOver = false;
         let winner = null;
         
         function gameLoop() {
@@ -2303,8 +2648,10 @@
             drawBackground();
             
             // Update game state
-            if (!gameOver) {
-                player.handleInput(keys);
+            if (!window.gameOver) {
+                // Get fresh input state each frame
+                const currentKeys = inputManager.getKeys();
+                player.handleInput(currentKeys);
                 player.update();
                 
                 aiController.update(player);
@@ -2335,7 +2682,7 @@
                 
                 // Check win conditions
                 if (player.health <= 0 || aiPlayer.health <= 0) {
-                    gameOver = true;
+                    window.gameOver = true;
                     winner = player.health > 0 ? 'PLAYER 1' : 'CPU';
                 }
             }
@@ -2389,7 +2736,7 @@
             ctx.textAlign = 'left';
             
             // Game over screen
-            if (gameOver) {
+            if (window.gameOver) {
                 // Darken screen
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
