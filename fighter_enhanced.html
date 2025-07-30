@@ -994,26 +994,27 @@
                     return projComingToward && projDistance < 300;
                 });
                 
-                // In Street Fighter, you're in blocking stance whenever you hold back
-                // The actual block only succeeds if there's an active threat when hit
+                // In Street Fighter, blocking vs walking backwards depends on proximity and threats
                 const distance = Math.abs(this.x - opponent.x);
-                this.blocking = holdingBack && !this.isDizzy;
+                const inBlockRange = distance < 150; // Close enough that back = block
                 
-                // Check if there's an active threat (for visual feedback or priority)
+                // Check if there's an active threat
                 const hasActiveThreat = (opponentHasActiveHitbox && distance < 200) || hasIncomingProjectile;
+                
+                // You're in blocking stance if:
+                // 1. Holding back AND (close to opponent OR active threat exists)
+                // This allows walking backwards when far away with no threats
+                this.blocking = holdingBack && !this.isDizzy && (inBlockRange || hasActiveThreat);
                 
                 // Debug logging for player
                 if (this.isPlayer && (this.blocking || holdingBack)) {
                     console.log('[PLAYER] handleInput blocking check:', {
                         blocking: this.blocking,
                         holdingBack: holdingBack,
-                        backKey: backKey,
-                        keys_a: keys['a'],
-                        keys_d: keys['d'],
-                        facing: this.facing,
+                        inBlockRange: inBlockRange,
+                        distance: distance,
                         hasActiveThreat: hasActiveThreat,
                         opponentHasActiveHitbox: opponentHasActiveHitbox,
-                        distance: distance,
                         hasIncomingProjectile: hasIncomingProjectile,
                         state: this.state
                     });
@@ -1154,14 +1155,6 @@
                     this.velocityX = direction * speed;
                     this.state = 'walk';
                     
-                    // Debug log for player
-                    if (this.isPlayer) {
-                        console.log('[PLAYER] Walking:', {
-                            direction: direction,
-                            blocking: this.blocking,
-                            state: this.state
-                        });
-                    }
                 }
             }
 
@@ -1511,7 +1504,8 @@
                     }
                 }
                 
-                console.log(`[${this.isPlayer ? 'PLAYER' : 'CPU'}] Block result:`, blocked);
+                console.log(`[${this.isPlayer ? 'PLAYER' : 'CPU'}] Block result:`, blocked, 
+                    blocked ? 'BLOCKED!' : `HIT! (isLow: ${isLowAttack}, crouching: ${this.crouching})`);
                 
                 // Failed to block low attack while standing
                 if (this.blocking && this.grounded && !this.crouching && isLowAttack) {
