@@ -177,12 +177,11 @@
         }
         
         /* 6-button layout optimized for mobile */
-        .btn-lp { top: 30px; right: 210px; }
-        .btn-mp { top: 0; right: 120px; }
-        .btn-hp { top: 0; right: 30px; }
-        .btn-lk { bottom: 30px; right: 210px; }
-        .btn-mk { bottom: 0; right: 120px; }
-        .btn-hk { bottom: 0; right: 30px; }
+        /* 2x2 button layout */
+        .btn-lp { top: 0; left: 0; }
+        .btn-hp { top: 0; right: 0; }
+        .btn-lk { bottom: 0; left: 0; }
+        .btn-hk { bottom: 0; right: 0; }
         
         @media (max-width: 768px) {
             .controls {
@@ -222,11 +221,9 @@
             <!-- Action Buttons -->
             <div class="action-buttons">
                 <div class="touch-button action-button btn-lp" data-key="u">LP</div>
-                <div class="touch-button action-button btn-mp" data-key="i">MP</div>
-                <div class="touch-button action-button btn-hp" data-key="o">HP</div>
+                <div class="touch-button action-button btn-hp" data-key="i">HP</div>
                 <div class="touch-button action-button btn-lk" data-key="j">LK</div>
-                <div class="touch-button action-button btn-mk" data-key="k">MK</div>
-                <div class="touch-button action-button btn-hk" data-key="l">HK</div>
+                <div class="touch-button action-button btn-hk" data-key="k">HK</div>
             </div>
         </div>
     </div>
@@ -491,19 +488,19 @@
                         this.keys['s'] = false;
                     }
                     
-                    // Button mapping (Xbox/PS5 compatible)
-                    // X/Square = LP, Y/Triangle = MP, RB/R1 = HP
-                    // A/X = LK, B/Circle = MK, RT/R2 = HK
+                    // Button mapping (Xbox/PS5 compatible) - 4 BUTTON SYSTEM
+                    // X/Square = LP, Y/Triangle = HP
+                    // A/X = LK, B/Circle = HK
                     
                     const buttonMap = {
                         0: 'j',  // A/X button -> LK
-                        1: 'k',  // B/Circle -> MK
+                        1: 'k',  // B/Circle -> HK
                         2: 'u',  // X/Square -> LP
-                        3: 'i',  // Y/Triangle -> MP
-                        4: 'o',  // LB/L1 -> HP (alternative)
-                        5: 'o',  // RB/R1 -> HP
-                        6: 'l',  // LT/L2 -> HK (alternative)
-                        7: 'l'   // RT/R2 -> HK
+                        3: 'i',  // Y/Triangle -> HP
+                        4: 'u',  // LB/L1 -> LP (alternative)
+                        5: 'i',  // RB/R1 -> HP (alternative)
+                        6: 'j',  // LT/L2 -> LK (alternative)
+                        7: 'k'   // RT/R2 -> HK (alternative)
                     };
                     
                     // Update button states
@@ -1629,8 +1626,8 @@
                     return;
                 }
                 
-                // Check for throw
-                if (keys['i'] && keys['k'] && this.state !== 'attack' && this.grounded) {
+                // Check for throw (LP + LK)
+                if (keys['u'] && keys['j'] && this.state !== 'attack' && this.grounded) {
                     this.attemptThrow();
                     return;
                 }
@@ -1638,8 +1635,8 @@
                 // Check for special moves first
                 if (this.state !== 'attack' || (this.currentMove && FRAME_DATA[this.currentMove].cancelable)) {
                     // Debug: log when punch buttons are pressed
-                    const punchPressed = keys['u'] || keys['i'] || keys['o'];
-                    const kickPressed = keys['j'] || keys['k'] || keys['l'];
+                    const punchPressed = keys['u'] || keys['i'];  // LP or HP
+                    const kickPressed = keys['j'] || keys['k'];   // LK or HK
                     
                     if (this.isPlayer && (punchPressed || kickPressed)) {
                         console.log('[SPECIAL] Button pressed! Punch:', punchPressed, 'Kick:', kickPressed);
@@ -1716,36 +1713,30 @@
                     }
                 }
                 
-                // Normal attacks
+                // Normal attacks - 4 BUTTON SYSTEM
                 if (this.state !== 'attack' || this.canCancelIntoNormal()) {
                     if (!this.grounded) {
                         // Jumping attacks
                         if (keys['u']) this.attack('jLP');
-                        else if (keys['i']) this.attack('jMP');
-                        else if (keys['o']) this.attack('jHP');
+                        else if (keys['i']) this.attack('jHP');
                         else if (keys['j']) this.attack('jLK');
-                        else if (keys['k']) this.attack('jMK');
-                        else if (keys['l']) this.attack('jHK');
+                        else if (keys['k']) this.attack('jHK');
                     } else if (this.crouching) {
                         // Crouching attacks
                         if (keys['u']) this.attack('crLP');
-                        else if (keys['i']) this.attack('crMP');
-                        else if (keys['o']) this.attack('crHP');
+                        else if (keys['i']) this.attack('crHP');
                         else if (keys['j']) this.attack('crLK');
-                        else if (keys['k']) this.attack('crMK');
-                        else if (keys['l']) this.attack('crHK');
+                        else if (keys['k']) this.attack('crHK');
                     } else {
-                        // Standing attacks - check proximity
+                        // Standing attacks - check proximity for hard attacks
                         const opponent = this.isPlayer ? aiPlayer : player;
                         const distance = Math.abs(this.x - opponent.x);
                         const isClose = distance < 80;
                         
                         if (keys['u']) this.attack('LP');
-                        else if (keys['i']) this.attack(isClose ? 'closeMP' : 'MP');
-                        else if (keys['o']) this.attack(isClose ? 'closeHP' : 'HP');
+                        else if (keys['i']) this.attack(isClose ? 'closeHP' : 'HP');
                         else if (keys['j']) this.attack('LK');
-                        else if (keys['k']) this.attack(isClose ? 'closeMK' : 'MK');
-                        else if (keys['l']) this.attack(isClose ? 'closeHK' : 'HK');
+                        else if (keys['k']) this.attack(isClose ? 'closeHK' : 'HK');
                     }
                 }
             }
@@ -2465,35 +2456,27 @@
 
         // All the frame data and input system classes remain the same
         const FRAME_DATA = {
-            // Standing normals - REDUCED DAMAGE
-            LP: { startup: 3, active: 2, recovery: 6, damage: 2, hitstun: 11, blockstun: 9, pushback: 1, cancelable: true },
-            MP: { startup: 5, active: 3, recovery: 9, damage: 4, hitstun: 16, blockstun: 14, pushback: 2, cancelable: true },
-            HP: { startup: 8, active: 4, recovery: 18, damage: 7, hitstun: 22, blockstun: 18, pushback: 4, cancelable: false },
-            LK: { startup: 4, active: 3, recovery: 7, damage: 2, hitstun: 12, blockstun: 10, pushback: 1, cancelable: true },
-            MK: { startup: 7, active: 4, recovery: 11, damage: 5, hitstun: 18, blockstun: 15, pushback: 3, cancelable: false },
-            HK: { startup: 10, active: 5, recovery: 20, damage: 8, hitstun: 24, blockstun: 20, pushback: 5, cancelable: false },
+            // Standing normals - 4 BUTTON SYSTEM
+            LP: { startup: 3, active: 2, recovery: 6, damage: 3, hitstun: 11, blockstun: 9, pushback: 1, cancelable: true },
+            HP: { startup: 8, active: 4, recovery: 18, damage: 8, hitstun: 22, blockstun: 18, pushback: 4, cancelable: false },
+            LK: { startup: 4, active: 3, recovery: 7, damage: 3, hitstun: 12, blockstun: 10, pushback: 1, cancelable: true },
+            HK: { startup: 10, active: 5, recovery: 20, damage: 9, hitstun: 24, blockstun: 20, pushback: 5, cancelable: false },
             
             // Close normals
-            closeMP: { startup: 4, active: 3, recovery: 8, damage: 4, hitstun: 16, blockstun: 14, pushback: 1, cancelable: true },
-            closeHP: { startup: 6, active: 4, recovery: 14, damage: 7, hitstun: 22, blockstun: 18, pushback: 2, cancelable: true },
-            closeMK: { startup: 5, active: 4, recovery: 10, damage: 5, hitstun: 18, blockstun: 15, pushback: 2, cancelable: true },
-            closeHK: { startup: 8, active: 5, recovery: 16, damage: 8, hitstun: 24, blockstun: 20, pushback: 3, cancelable: false },
+            closeHP: { startup: 6, active: 4, recovery: 14, damage: 8, hitstun: 22, blockstun: 18, pushback: 2, cancelable: true },
+            closeHK: { startup: 8, active: 5, recovery: 16, damage: 9, hitstun: 24, blockstun: 20, pushback: 3, cancelable: false },
             
             // Crouching normals
             crLP: { startup: 3, active: 2, recovery: 6, damage: 2, hitstun: 10, blockstun: 8, pushback: 0, cancelable: true, low: false },
-            crMP: { startup: 5, active: 3, recovery: 9, damage: 3, hitstun: 15, blockstun: 13, pushback: 1, cancelable: true, low: false },
-            crHP: { startup: 7, active: 4, recovery: 16, damage: 6, hitstun: 20, blockstun: 17, pushback: 3, cancelable: true, low: false },
+            crHP: { startup: 7, active: 4, recovery: 16, damage: 7, hitstun: 20, blockstun: 17, pushback: 3, cancelable: true, low: false },
             crLK: { startup: 4, active: 2, recovery: 7, damage: 2, hitstun: 11, blockstun: 9, pushback: 0, cancelable: true, low: true },
-            crMK: { startup: 6, active: 3, recovery: 11, damage: 4, hitstun: 16, blockstun: 14, pushback: 2, cancelable: true, low: true },
-            crHK: { startup: 9, active: 5, recovery: 22, damage: 6, hitstun: 0, blockstun: 18, pushback: 4, knockdown: true, low: true },
+            crHK: { startup: 9, active: 5, recovery: 22, damage: 7, hitstun: 0, blockstun: 18, pushback: 4, knockdown: true, low: true },
             
             // Jumping normals
-            jLP: { startup: 5, active: 10, recovery: 0, damage: 3, hitstun: 14, blockstun: 12, pushback: 1 },
-            jMP: { startup: 6, active: 8, recovery: 0, damage: 5, hitstun: 18, blockstun: 16, pushback: 2 },
-            jHP: { startup: 8, active: 6, recovery: 0, damage: 7, hitstun: 22, blockstun: 20, pushback: 3 },
-            jLK: { startup: 5, active: 10, recovery: 0, damage: 3, hitstun: 14, blockstun: 12, pushback: 1 },
-            jMK: { startup: 7, active: 8, recovery: 0, damage: 5, hitstun: 18, blockstun: 16, pushback: 2 },
-            jHK: { startup: 9, active: 6, recovery: 0, damage: 7, hitstun: 22, blockstun: 20, pushback: 3 },
+            jLP: { startup: 5, active: 10, recovery: 0, damage: 4, hitstun: 14, blockstun: 12, pushback: 1 },
+            jHP: { startup: 8, active: 6, recovery: 0, damage: 8, hitstun: 22, blockstun: 20, pushback: 3 },
+            jLK: { startup: 5, active: 10, recovery: 0, damage: 4, hitstun: 14, blockstun: 12, pushback: 1 },
+            jHK: { startup: 9, active: 6, recovery: 0, damage: 8, hitstun: 22, blockstun: 20, pushback: 3 },
             
             // Special moves
             hadouken: { startup: 13, active: 40, recovery: 40, damage: 8, hitstun: 20, blockstun: 16, pushback: 3, projectile: true },
