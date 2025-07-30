@@ -2002,7 +2002,7 @@
                                 // Check if we've reached the hit limit for multi-hit moves
                                 const maxHits = moveData.hits || 1;
                                 if (attacker.currentMoveHits >= maxHits) {
-                                    continue;  // Skip this hit if we've reached the limit
+                                    return;  // Skip this hit if we've reached the limit
                                 }
                                 
                                 // For multi-hit moves, space out the hits
@@ -2012,7 +2012,7 @@
                                     const expectedHitFrame = attacker.currentMoveHits * framesPerHit;
                                     
                                     if (currentHitFrame < expectedHitFrame) {
-                                        continue;  // Too early for the next hit
+                                        return;  // Too early for the next hit
                                     }
                                 }
                                 
