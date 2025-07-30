@@ -526,49 +526,93 @@
                     // Track directional changes and add to input buffer for special moves
                     if (this.player && this.player.inputBuffer) {
                         const facing = this.player.facing || 1;
+                        let addedDirection = null;
                         
                         // Check for directional changes
                         if (currentState.down && !this.lastDirections.down) {
                             this.player.inputBuffer.addDirection('2');
+                            addedDirection = '2';
                         }
                         if (currentState.up && !this.lastDirections.up) {
                             this.player.inputBuffer.addDirection('8');
+                            addedDirection = '8';
                         }
                         
                         // Handle left/right based on facing
                         if (facing === 1) {
                             if (currentState.left && !this.lastDirections.left) {
                                 this.player.inputBuffer.addDirection('4');
+                                addedDirection = '4';
                             }
                             if (currentState.right && !this.lastDirections.right) {
                                 this.player.inputBuffer.addDirection('6');
+                                addedDirection = '6';
                             }
                         } else {
                             // Reversed when facing left
                             if (currentState.left && !this.lastDirections.left) {
                                 this.player.inputBuffer.addDirection('6');
+                                addedDirection = '6';
                             }
                             if (currentState.right && !this.lastDirections.right) {
                                 this.player.inputBuffer.addDirection('4');
+                                addedDirection = '4';
                             }
                         }
                         
-                        // Handle diagonals
+                        // Handle diagonals - always add current diagonal state
                         if (currentState.down && currentState.right) {
-                            if (!this.lastDirections.down || !this.lastDirections.right) {
-                                this.player.inputBuffer.addDirection(facing === 1 ? '3' : '1');
+                            const dir = facing === 1 ? '3' : '1';
+                            // Add direction if it changed or every few frames while holding
+                            if (!this.lastDirections.down || !this.lastDirections.right || 
+                                (this.player.inputBuffer.directions.length === 0 || 
+                                 this.player.inputBuffer.directions[this.player.inputBuffer.directions.length - 1].dir !== dir)) {
+                                this.player.inputBuffer.addDirection(dir);
+                                addedDirection = dir;
                             }
                         } else if (currentState.down && currentState.left) {
-                            if (!this.lastDirections.down || !this.lastDirections.left) {
-                                this.player.inputBuffer.addDirection(facing === 1 ? '1' : '3');
+                            const dir = facing === 1 ? '1' : '3';
+                            if (!this.lastDirections.down || !this.lastDirections.left ||
+                                (this.player.inputBuffer.directions.length === 0 || 
+                                 this.player.inputBuffer.directions[this.player.inputBuffer.directions.length - 1].dir !== dir)) {
+                                this.player.inputBuffer.addDirection(dir);
+                                addedDirection = dir;
                             }
                         } else if (currentState.up && currentState.right) {
-                            if (!this.lastDirections.up || !this.lastDirections.right) {
-                                this.player.inputBuffer.addDirection(facing === 1 ? '9' : '7');
+                            const dir = facing === 1 ? '9' : '7';
+                            if (!this.lastDirections.up || !this.lastDirections.right ||
+                                (this.player.inputBuffer.directions.length === 0 || 
+                                 this.player.inputBuffer.directions[this.player.inputBuffer.directions.length - 1].dir !== dir)) {
+                                this.player.inputBuffer.addDirection(dir);
+                                addedDirection = dir;
                             }
                         } else if (currentState.up && currentState.left) {
-                            if (!this.lastDirections.up || !this.lastDirections.left) {
-                                this.player.inputBuffer.addDirection(facing === 1 ? '7' : '9');
+                            const dir = facing === 1 ? '7' : '9';
+                            if (!this.lastDirections.up || !this.lastDirections.left ||
+                                (this.player.inputBuffer.directions.length === 0 || 
+                                 this.player.inputBuffer.directions[this.player.inputBuffer.directions.length - 1].dir !== dir)) {
+                                this.player.inputBuffer.addDirection(dir);
+                                addedDirection = dir;
+                            }
+                        }
+                        
+                        // Debug logging for gamepad inputs
+                        if (addedDirection && this.player.isPlayer) {
+                            const recentDirs = this.player.inputBuffer.directions
+                                .slice(-6)
+                                .map(d => d.dir)
+                                .join('');
+                            console.log('[GAMEPAD] Input:', addedDirection, '| Buffer:', recentDirs);
+                            
+                            // Check for special moves
+                            if (recentDirs.includes('236')) {
+                                console.log('[GAMEPAD] Hadouken motion detected!');
+                            }
+                            if (recentDirs.includes('623')) {
+                                console.log('[GAMEPAD] Shoryuken motion detected!');
+                            }
+                            if (recentDirs.includes('214')) {
+                                console.log('[GAMEPAD] Tatsumaki motion detected!');
                             }
                         }
                         
@@ -2460,11 +2504,33 @@
             }
 
             checkMotion(motion) {
-                const recent = this.directions.slice(-motion.length);
+                // Make motion detection more lenient
+                // Check last 8 directions for the pattern
+                const recent = this.directions.slice(-8);
                 if (recent.length < motion.length) return false;
                 
+                // Join all recent directions
                 const motionStr = recent.map(d => d.dir).join('');
-                return motionStr.includes(motion);
+                
+                // Debug log for player
+                if (this.directions.length > 0 && motion.length > 1) {
+                    console.log('[INPUT] Checking motion:', motion, 'in buffer:', motionStr);
+                }
+                
+                // Check if motion exists anywhere in recent buffer
+                if (motionStr.includes(motion)) {
+                    console.log('[INPUT] Motion matched!', motion);
+                    return true;
+                }
+                
+                // Also check with some leniency - allow skipping neutral (5)
+                const cleanedMotion = motionStr.replace(/5/g, '');
+                if (cleanedMotion.includes(motion)) {
+                    console.log('[INPUT] Motion matched with leniency!', motion);
+                    return true;
+                }
+                
+                return false;
             }
 
             checkButton(btn) {
