@@ -27,8 +27,8 @@
             display: block;
         }
         .controls {
-            position: absolute;
-            bottom: -50px;
+            position: fixed;
+            bottom: 10px;
             left: 50%;
             transform: translateX(-50%);
             color: #fff;
@@ -39,6 +39,7 @@
             border-radius: 10px;
             border: 1px solid #444;
             text-shadow: 2px 2px 4px #000;
+            z-index: 1000;
         }
         .combo-display {
             position: absolute;
@@ -72,12 +73,10 @@
     </div>
 
     <script>
-        console.log('Script starting...');
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         canvas.width = 960;
         canvas.height = 540;
-        console.log('Canvas initialized:', canvas.width, 'x', canvas.height);
 
         // Enable image smoothing for better graphics
         ctx.imageSmoothingEnabled = false;
@@ -1948,17 +1947,9 @@
         }
 
         // Initialize game
-        console.log('Creating fighters...');
-        let player, aiPlayer, aiController;
-        try {
-            player = new Fighter(250, true);
-            aiPlayer = new Fighter(710, false);
-            aiController = new AIController(aiPlayer);
-            console.log('Fighters created successfully');
-        } catch (error) {
-            console.error('Error creating fighters:', error);
-            alert('Error creating fighters: ' + error.message);
-        }
+        let player = new Fighter(250, true);
+        let aiPlayer = new Fighter(710, false);
+        let aiController = new AIController(aiPlayer);
         
         // Input handling
         const keys = {};
@@ -2141,10 +2132,6 @@
         let winner = null;
         
         function gameLoop() {
-            // Test draw - red rectangle
-            ctx.fillStyle = 'red';
-            ctx.fillRect(10, 10, 50, 50);
-            
             // Handle global effects
             if (hitPause > 0) {
                 hitPause--;
@@ -2300,13 +2287,7 @@
         }
         
         // Start game
-        try {
-            console.log('Starting game loop...');
-            gameLoop();
-        } catch (error) {
-            console.error('Error starting game:', error);
-            alert('Error starting game: ' + error.message);
-        }
+        gameLoop();
     </script>
 </body>
 </html>
