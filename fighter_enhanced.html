@@ -405,8 +405,8 @@
                 // Arms
                 ctx.fillStyle = this.skinColor;
                 
-                if (this.blocking) {
-                    // Blocking pose - crossed arms
+                if (this.blocking && !this.crouching) {
+                    // High blocking pose - crossed arms
                     ctx.save();
                     // Left arm across body
                     ctx.translate(this.x, baseY - 65 + bounce);
@@ -423,10 +423,10 @@
                     ctx.fillRect(-35, -2, 12, 16);
                     ctx.restore();
                     
-                    // Blocking shield effect
+                    // High blocking shield effect
                     ctx.save();
-                    ctx.strokeStyle = '#ffff00';
-                    ctx.lineWidth = 2;
+                    ctx.strokeStyle = '#00ffff';
+                    ctx.lineWidth = 3;
                     ctx.globalAlpha = 0.5 + Math.sin(this.animTimer * 0.2) * 0.2;
                     ctx.beginPath();
                     ctx.arc(this.x, baseY - 50 + bounce, 35, -0.5, Math.PI + 0.5);
@@ -643,6 +643,27 @@
                 ctx.lineTo(this.x + 10, squashY - 12);
                 ctx.closePath();
                 ctx.fill();
+                
+                // Low blocking pose
+                if (this.blocking) {
+                    ctx.fillStyle = this.skinColor;
+                    // Arms in front for low block
+                    ctx.save();
+                    ctx.translate(this.x, squashY - 35);
+                    ctx.rotate(0.3);
+                    ctx.fillRect(-20, 0, 40, 12);
+                    ctx.fillRect(-25, -2, 12, 16);
+                    ctx.fillRect(15, -2, 12, 16);
+                    ctx.restore();
+                    
+                    // Low blocking shield effect
+                    ctx.save();
+                    ctx.strokeStyle = '#ff00ff';
+                    ctx.lineWidth = 3;
+                    ctx.globalAlpha = 0.5 + Math.sin(this.animTimer * 0.2) * 0.2;
+                    ctx.strokeRect(this.x - 30, squashY - 45, 60, 45);
+                    ctx.restore();
+                }
                 
                 // Crouch attacks
                 if (this.state === 'attack' && this.currentMove) {
@@ -924,15 +945,28 @@
                     }
                 }
                 
-                // Check if opponent is attacking or has projectiles
+                // Update facing BEFORE checking block direction (for cross-ups)
                 const opponent = this.isPlayer ? aiPlayer : player;
+                if (opponent && this.state !== 'attack' && !this.knockdownFrames) {
+                    const oldFacing = this.facing;
+                    this.facing = this.x < opponent.x ? 1 : -1;
+                    
+                    // If facing changed (cross-up), immediately update blocking
+                    if (oldFacing !== this.facing) {
+                        this.blocking = false; // Reset blocking on cross-up
+                    }
+                }
                 
                 // Determine if we should block based on:
                 // 1. Opponent has active hitboxes (actually in attack frames)
                 // 2. Opponent has projectiles coming our way
-                // 3. We're holding the back direction
+                // 3. We're holding the CURRENT back direction (after facing update)
                 const backKey = this.facing === 1 ? 'a' : 'd';
                 const holdingBack = keys[backKey];
+                
+                // Also check if we're holding down for low blocking
+                const holdingDown = keys['s'];
+                this.crouching = holdingDown; // Update crouching state for blocking
                 
                 // Check if opponent has active hitboxes - more direct approach
                 let opponentHasActiveHitbox = opponent.hitboxes.length > 0;
@@ -950,7 +984,15 @@
                 const shouldBlock = holdingBack && !this.isDizzy && 
                                   ((opponentHasActiveHitbox && distance < 200) || hasIncomingProjectile);
                 
+                // Set blocking state and type
                 this.blocking = shouldBlock;
+                
+                // Visual feedback for blocking type
+                if (this.blocking) {
+                    this.blockType = holdingDown ? 'low' : 'high';
+                } else {
+                    this.blockType = null;
+                }
                 
                 
                 // Movement
@@ -964,11 +1006,13 @@
                         this.state = this.crouching ? 'crouch' : 'idle';
                     }
                     
-                    // Crouching
-                    if (keys['s']) {
-                        this.crouch();
-                    } else {
-                        this.crouching = false;
+                    // Crouching (only update if not blocking)
+                    if (!this.blocking) {
+                        if (keys['s']) {
+                            this.crouch();
+                        } else {
+                            this.crouching = false;
+                        }
                     }
                     
                     // Jumping - SF2 style with directional jumps
@@ -1283,11 +1327,7 @@
                 // Bounds
                 this.x = Math.max(50, Math.min(canvas.width - 50, this.x));
                 
-                // Update facing
-                const opponent = this.isPlayer ? aiPlayer : player;
-                if (opponent && this.state !== 'attack' && !this.knockdownFrames) {
-                    this.facing = this.x < opponent.x ? 1 : -1;
-                }
+                // Facing is now updated in handleInput for better cross-up handling
                 
                 // Update hitboxes
                 this.updateHitboxes();
@@ -1334,15 +1374,66 @@
 
             takeDamage(damage, hitstun, blockstun, pushback, knockdown = false, attacker = null) {
                 // Check blocking at the moment of impact
+                const isLowAttack = FRAME_DATA[attacker?.currentMove]?.low;
                 const blocked = this.blocking && this.grounded && 
-                    (!FRAME_DATA[attacker?.currentMove]?.low || this.crouching);
+                    (!isLowAttack || this.crouching);
+                
+                // Wrong block type feedback
+                if (this.blocking && this.grounded && isLowAttack && !this.crouching) {
+                    // Tried to block low attack while standing - full damage!
+                    this.health -= damage;
+                    this.hitstunFrames = hitstun;
+                    this.pushbackVelocity = -this.facing * pushback;
+                    
+                    // Visual indicator of failed block
+                    for (let i = 0; i < 10; i++) {
+                        particles.push(new Particle(
+                            this.x + (Math.random() - 0.5) * 40,
+                            this.y - 20,
+                            'hit'
+                        ));
+                    }
+                    return;
+                }
                 
                 
                 if (blocked) {
-                    // Chip damage
-                    this.health -= damage * 0.1;
+                    // Successful block - chip damage (special moves do more chip)
+                    const chipMultiplier = attacker?.currentMove?.includes('hadouken') || 
+                                         attacker?.currentMove?.includes('shoryuken') || 
+                                         attacker?.currentMove?.includes('tatsumaki') ? 0.25 : 0.1;
+                    const chipDamage = damage * chipMultiplier;
+                    this.health -= chipDamage;
                     this.blockstunFrames = blockstun;
                     this.pushbackVelocity = -this.facing * pushback * 0.6;
+                    
+                    // Show chip damage number
+                    if (chipDamage > 0) {
+                        particles.push({
+                            x: this.x,
+                            y: this.y - 100,
+                            life: 30,
+                            type: 'chip',
+                            text: `-${Math.floor(chipDamage)}`,
+                            vy: -2,
+                            update() {
+                                this.y += this.vy;
+                                this.vy += 0.1;
+                                this.life--;
+                            },
+                            draw() {
+                                ctx.save();
+                                ctx.globalAlpha = this.life / 30;
+                                ctx.font = 'bold 16px Arial';
+                                ctx.fillStyle = '#ff9900';
+                                ctx.strokeStyle = '#000';
+                                ctx.lineWidth = 2;
+                                ctx.strokeText(this.text, this.x, this.y);
+                                ctx.fillText(this.text, this.x, this.y);
+                                ctx.restore();
+                            }
+                        });
+                    }
                     
                     // Block particles
                     for (let i = 0; i < 5; i++) {
