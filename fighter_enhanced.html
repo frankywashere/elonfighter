@@ -622,6 +622,14 @@
                             if (recentDirs.includes('263')) {
                                 console.log('[GAMEPAD] Tip: You did quarter-circle FORWARD. For Tatsumaki, do quarter-circle BACK (down, down-back, back)');
                             }
+                            
+                            // Check if they're close to a special move
+                            if (recentDirs.includes('21') || recentDirs.includes('23')) {
+                                console.log('[GAMEPAD] Tip: Almost Hadouken! Complete with forward (→) + punch');
+                            }
+                            if (recentDirs.includes('62')) {
+                                console.log('[GAMEPAD] Tip: Almost Shoryuken! Complete with down-forward (↘) + punch');
+                            }
                         }
                         
                         // Update last directions
@@ -2554,20 +2562,38 @@
                 // For Hadouken (236), also accept 2356, 2536, etc.
                 // For Shoryuken (623), also accept 6523, 6235, etc.
                 if (motion === '236') {
-                    // Quarter circle forward - accept variations
-                    if (motionStr.match(/2[35]?[56]?6/) || cleanedMotion.match(/2[35]?6/)) {
+                    // Quarter circle forward - accept many variations
+                    // Look for: down (2) -> any forward motion (3 or 6)
+                    // Allow back inputs in between as long as it ends forward
+                    if (motionStr.match(/2[1-9]*[36]/) || 
+                        motionStr.match(/2[1-9]*6/) ||
+                        cleanedMotion.match(/2[36]/) ||
+                        // Even more lenient - just need down then forward somewhere
+                        (motionStr.includes('2') && 
+                         (motionStr.indexOf('6') > motionStr.indexOf('2') || 
+                          motionStr.indexOf('3') > motionStr.indexOf('2')))) {
                         console.log('[INPUT] Hadouken motion matched with gamepad leniency!');
                         return true;
                     }
                 } else if (motion === '623') {
                     // Dragon punch - accept variations
-                    if (motionStr.match(/6[25]?2[35]?3/) || cleanedMotion.match(/62[35]?/)) {
+                    if (motionStr.match(/6[1-9]*2[1-9]*3/) || 
+                        cleanedMotion.match(/623/) ||
+                        // Forward -> Down -> Down-forward pattern anywhere
+                        (motionStr.includes('6') && motionStr.includes('2') && motionStr.includes('3') &&
+                         motionStr.indexOf('6') < motionStr.indexOf('2') && 
+                         motionStr.indexOf('2') < motionStr.indexOf('3'))) {
                         console.log('[INPUT] Shoryuken motion matched with gamepad leniency!');
                         return true;
                     }
                 } else if (motion === '214') {
                     // Quarter circle back - accept variations
-                    if (motionStr.match(/2[15]?[45]?4/) || cleanedMotion.match(/2[15]?4/)) {
+                    if (motionStr.match(/2[1-9]*[14]/) || 
+                        cleanedMotion.match(/2[14]/) ||
+                        // Down then back pattern
+                        (motionStr.includes('2') && 
+                         (motionStr.indexOf('4') > motionStr.indexOf('2') || 
+                          motionStr.indexOf('1') > motionStr.indexOf('2')))) {
                         console.log('[INPUT] Tatsumaki motion matched with gamepad leniency!');
                         return true;
                     }
