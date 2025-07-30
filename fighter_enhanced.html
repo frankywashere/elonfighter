@@ -1768,6 +1768,12 @@
             }
 
             jump(direction) {
+                // Can only jump if grounded
+                if (!this.grounded) {
+                    console.log(`[${this.isPlayer ? 'PLAYER' : 'AI'}] Attempted to jump while airborne!`);
+                    return;
+                }
+                
                 this.velocityY = JUMP_VELOCITY_Y;
                 this.jumpDirection = direction;
                 this.velocityX = direction * JUMP_VELOCITY_X;
@@ -2580,11 +2586,13 @@
                 // But be more strict to prevent false positives
                 if (motion === '236') {
                     // Hadouken - must have down->forward motion in sequence
-                    // Check last 6 inputs for the pattern
-                    const recentStr = recent.slice(-6).map(d => d.dir).join('');
-                    if (recentStr.match(/2[35]?6$/) ||  // Ends with the motion
-                        recentStr.match(/23[56]$/) ||    // With diagonal
-                        cleanedMotion.slice(-3).match(/236/)) {  // Clean motion at end
+                    // Check last 8 inputs for the pattern (more lenient)
+                    const recentStr = recent.slice(-8).map(d => d.dir).join('');
+                    // Allow the motion anywhere in recent inputs, not just at end
+                    if (recentStr.includes('236') ||     // Direct motion
+                        recentStr.match(/2[35]+6/) ||     // With diagonals
+                        recentStr.match(/2[14]?3+6/) ||   // Allow some back input
+                        cleanedMotion.includes('236')) {  // Clean motion anywhere
                         console.log('[INPUT] Hadouken motion matched with gamepad leniency!');
                         return true;
                     }
