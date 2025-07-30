@@ -1093,17 +1093,25 @@
                 
                 // Movement
                 if (this.state !== 'attack') {
-                    // Walking - don't walk when blocking
-                    if (!this.blocking) {
+                    // Walking - allow backward movement when blocking if no active threat
+                    const canWalkWhileBlocking = this.blocking && !hasActiveThreat && holdingBack;
+                    
+                    if (!this.blocking || canWalkWhileBlocking) {
                         if (keys['a'] && !this.crouching) {
-                            this.walk(-1); // Always move left with A
+                            // Only allow backward walk when blocking (walking away from opponent)
+                            if (!this.blocking || (this.blocking && this.facing === 1)) {
+                                this.walk(-1); // Always move left with A
+                            }
                         } else if (keys['d'] && !this.crouching) {
-                            this.walk(1);  // Always move right with D
+                            // Only allow backward walk when blocking (walking away from opponent)
+                            if (!this.blocking || (this.blocking && this.facing === -1)) {
+                                this.walk(1);  // Always move right with D
+                            }
                         } else if (this.grounded && Math.abs(this.velocityX) < 0.5) {
                             this.state = this.crouching ? 'crouch' : 'idle';
                         }
                     } else {
-                        // When blocking, set appropriate state but don't walk
+                        // When blocking with active threat, set appropriate state but don't walk
                         if (this.grounded && Math.abs(this.velocityX) < 0.5) {
                             this.state = this.crouching ? 'crouch' : 'idle';
                         }
@@ -1165,17 +1173,7 @@
             }
 
             walk(direction) {
-                // Don't walk if blocking
-                if (this.blocking) {
-                    if (this.isPlayer) {
-                        console.log('[PLAYER] Walk prevented by blocking', {
-                            blocking: this.blocking,
-                            direction: direction,
-                            facing: this.facing
-                        });
-                    }
-                    return;
-                }
+                // Blocking check is now handled in handleInput movement section
                 
                 if (this.grounded && !this.crouching) {
                     const speed = direction === this.facing ? WALK_SPEED_FORWARD : WALK_SPEED_BACKWARD;
