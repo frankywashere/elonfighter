@@ -1133,8 +1133,8 @@
                         }
                     } else if (!this.grounded) {
                         spriteState = 'jump';
-                    } else if (this.state === 'attack' || this.currentMove) {
-                        // Handle special moves
+                    } else if (this.state === 'attack' && this.currentMove) {
+                        // Handle special moves - only if we're actually in attack state AND have a move
                         if (this.currentMove === 'hadouken') {
                             spriteState = 'P';  // Use punch sprite for hadouken
                         } else if (this.currentMove === 'shoryuken') {
@@ -2410,9 +2410,9 @@
                             
                             this.hitboxes.push({
                                 x: this.facing === 1 ? 25 : -25 - reach,
-                                y: this.currentMove.includes('cr') ? -40 : -80,
+                                y: this.currentMove.includes('cr') ? -50 : -100,  // Adjusted for larger sprites
                                 width: reach,
-                                height: 25
+                                height: 30
                             });
                         } else if (this.currentMove.includes('K') || this.currentMove === 'tatsumaki') {
                             // Kick hitboxes
@@ -2422,17 +2422,17 @@
                             
                             this.hitboxes.push({
                                 x: this.facing === 1 ? 25 : -25 - reach,
-                                y: this.currentMove.includes('cr') ? -30 : this.currentMove.includes('j') ? -40 : -60,
+                                y: this.currentMove.includes('cr') ? -40 : this.currentMove.includes('j') ? -60 : -80,  // Adjusted for larger sprites
                                 width: reach,
-                                height: 30
+                                height: 35
                             });
                         } else if (this.currentMove === 'shoryuken') {
                             // Rising uppercut hitbox
                             this.hitboxes.push({
                                 x: this.facing === 1 ? 10 : -40,
-                                y: -100,
-                                width: 30,
-                                height: 80
+                                y: -120,  // Adjusted for larger sprites
+                                width: 35,
+                                height: 100
                             });
                         }
                     }
@@ -2605,9 +2605,14 @@
                     
                     // Spawn projectile for hadouken
                     if (this.currentMove === 'hadouken' && this.moveFrame === frameData.startup) {
+                        // Spawn from fist position
+                        // When punching forward, fist is extended forward and at shoulder height
+                        const fistOffsetX = this.facing * 45;  // Extended arm reach
+                        const fistOffsetY = -110;  // Higher up - at actual fist height on the sprite
+                        
                         this.projectiles.push(new Projectile(
-                            this.x + this.facing * 60,
-                            this.y - 60,
+                            this.x + fistOffsetX,
+                            this.y + fistOffsetY,
                             this.facing,
                             this,
                             frameData
@@ -2621,6 +2626,10 @@
                             this.endAttack();
                         }
                     } else if (this.moveFrame >= frameData.startup + frameData.active + frameData.recovery) {
+                        // Debug log for hadouken
+                        if (this.currentMove === 'hadouken') {
+                            console.log('[HADOUKEN] Ending move at frame:', this.moveFrame);
+                        }
                         this.endAttack();
                     }
                 }
@@ -2743,6 +2752,11 @@
                         opponent.throwAttacker = null;
                         opponent.throwAnimationFrame = 0;
                     }
+                }
+                
+                // Debug log for special moves
+                if (this.currentMove === 'hadouken' || this.currentMove === 'shoryuken' || this.currentMove === 'tatsumaki') {
+                    console.log(`[FIGHTER] Ending special move: ${this.currentMove}`);
                 }
                 
                 this.state = 'idle';
@@ -3006,7 +3020,7 @@
                 ctx.font = 'bold 20px Arial';
                 ctx.shadowColor = this.isPlayer ? '#00ff00' : '#ff0000';
                 ctx.shadowBlur = 10;
-                ctx.fillText(this.isPlayer ? 'PLAYER 1' : 'CPU', x + 5, y - 8);
+                ctx.fillText(this.isPlayer ? 'ELON MUSK' : 'CPU', x + 5, y - 8);
                 ctx.shadowBlur = 0;
                 
                 // Stun gauge
@@ -3402,51 +3416,114 @@
             }
         }
 
-        // Stage background
+        // Futuristic corridor background
         function drawBackground() {
-            // Sky gradient
-            const skyGradient = ctx.createLinearGradient(0, 0, 0, GROUND_Y);
-            skyGradient.addColorStop(0, '#1e3c72');
-            skyGradient.addColorStop(0.5, '#2a5298');
-            skyGradient.addColorStop(1, '#7e8ba3');
-            ctx.fillStyle = skyGradient;
-            ctx.fillRect(0, 0, canvas.width, GROUND_Y);
+            // Base dark background
+            ctx.fillStyle = '#0a0a0f';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
             
-            // Clouds
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-            const cloudOffset = (Date.now() * 0.01) % canvas.width;
-            for (let i = 0; i < 5; i++) {
-                const x = (i * 200 + cloudOffset) % (canvas.width + 100) - 50;
-                const y = 50 + i * 30;
-                ctx.beginPath();
-                ctx.arc(x, y, 30, 0, Math.PI * 2);
-                ctx.arc(x + 25, y, 35, 0, Math.PI * 2);
-                ctx.arc(x + 50, y, 30, 0, Math.PI * 2);
-                ctx.fill();
-            }
+            // Draw perspective lines for depth
+            const vanishingX = canvas.width / 2;
+            const vanishingY = GROUND_Y / 2;
             
-            // Ground
-            const groundGradient = ctx.createLinearGradient(0, GROUND_Y, 0, canvas.height);
-            groundGradient.addColorStop(0, '#8B7355');
-            groundGradient.addColorStop(0.5, '#A0826D');
-            groundGradient.addColorStop(1, '#6B5637');
-            ctx.fillStyle = groundGradient;
-            ctx.fillRect(0, GROUND_Y, canvas.width, canvas.height - GROUND_Y);
-            
-            // Ground texture
-            ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+            // Ceiling grid
+            ctx.strokeStyle = 'rgba(100, 100, 120, 0.3)';
             ctx.lineWidth = 1;
-            for (let i = 0; i < canvas.width; i += 20) {
+            for (let i = 0; i <= 20; i++) {
+                const y = (i / 20) * GROUND_Y;
                 ctx.beginPath();
-                ctx.moveTo(i, GROUND_Y);
-                ctx.lineTo(i - 10, canvas.height);
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
                 ctx.stroke();
             }
             
-            // Stage edge markers
-            ctx.fillStyle = '#444';
-            ctx.fillRect(40, GROUND_Y - 10, 10, 10);
-            ctx.fillRect(canvas.width - 50, GROUND_Y - 10, 10, 10);
+            // Vertical perspective lines
+            for (let i = -10; i <= 10; i++) {
+                const x = vanishingX + i * 80;
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(vanishingX + i * 40, GROUND_Y);
+                ctx.stroke();
+            }
+            
+            // Glowing red corridor effect
+            const redGlow = ctx.createRadialGradient(vanishingX, vanishingY, 0, vanishingX, vanishingY, 400);
+            redGlow.addColorStop(0, 'rgba(255, 0, 0, 0.4)');
+            redGlow.addColorStop(0.5, 'rgba(200, 0, 0, 0.2)');
+            redGlow.addColorStop(1, 'rgba(100, 0, 0, 0)');
+            ctx.fillStyle = redGlow;
+            ctx.fillRect(0, 0, canvas.width, GROUND_Y);
+            
+            // Side pillars with red lights
+            const pillarWidth = 40;
+            for (let i = 0; i < 6; i++) {
+                const x = i * 160;
+                
+                // Left pillars
+                ctx.fillStyle = '#1a1a2e';
+                ctx.fillRect(x, 0, pillarWidth, GROUND_Y);
+                
+                // Red light strips on pillars
+                ctx.fillStyle = '#ff0040';
+                ctx.fillRect(x + pillarWidth/2 - 3, 100 + i * 30, 6, 60);
+                
+                // Light glow
+                const lightGlow = ctx.createRadialGradient(x + pillarWidth/2, 130 + i * 30, 0, x + pillarWidth/2, 130 + i * 30, 40);
+                lightGlow.addColorStop(0, 'rgba(255, 0, 64, 0.8)');
+                lightGlow.addColorStop(1, 'rgba(255, 0, 64, 0)');
+                ctx.fillStyle = lightGlow;
+                ctx.fillRect(x - 20, 90 + i * 30, pillarWidth + 40, 100);
+                
+                // Right pillars (mirror)
+                const rightX = canvas.width - x - pillarWidth;
+                ctx.fillStyle = '#1a1a2e';
+                ctx.fillRect(rightX, 0, pillarWidth, GROUND_Y);
+                ctx.fillStyle = '#ff0040';
+                ctx.fillRect(rightX + pillarWidth/2 - 3, 100 + i * 30, 6, 60);
+            }
+            
+            // Reflective floor
+            const floorGradient = ctx.createLinearGradient(0, GROUND_Y, 0, canvas.height);
+            floorGradient.addColorStop(0, '#2a2a3e');
+            floorGradient.addColorStop(0.3, '#1f1f2e');
+            floorGradient.addColorStop(1, '#0a0a0f');
+            ctx.fillStyle = floorGradient;
+            ctx.fillRect(0, GROUND_Y, canvas.width, canvas.height - GROUND_Y);
+            
+            // Floor reflections
+            ctx.save();
+            ctx.globalAlpha = 0.3;
+            ctx.scale(1, -0.5);
+            ctx.translate(0, -GROUND_Y * 2 - 80);
+            
+            // Reflect red lights
+            for (let i = 0; i < 6; i++) {
+                const x = i * 160;
+                ctx.fillStyle = '#ff0040';
+                ctx.fillRect(x + pillarWidth/2 - 3, 100 + i * 30, 6, 60);
+                ctx.fillRect(canvas.width - x - pillarWidth/2 - 3, 100 + i * 30, 6, 60);
+            }
+            ctx.restore();
+            
+            // Floor grid lines
+            ctx.strokeStyle = 'rgba(100, 100, 120, 0.2)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < canvas.width; i += 40) {
+                ctx.beginPath();
+                ctx.moveTo(i, GROUND_Y);
+                ctx.lineTo(i + 20, canvas.height);
+                ctx.stroke();
+            }
+            
+            // Stage boundaries with tech panels
+            ctx.fillStyle = '#2a2a3e';
+            ctx.fillRect(0, GROUND_Y - 20, 60, 20);
+            ctx.fillRect(canvas.width - 60, GROUND_Y - 20, 60, 20);
+            
+            // Tech details on boundaries
+            ctx.fillStyle = '#00ffff';
+            ctx.fillRect(10, GROUND_Y - 15, 30, 3);
+            ctx.fillRect(canvas.width - 40, GROUND_Y - 15, 30, 3);
         }
 
         // Initialize game
@@ -3761,7 +3838,7 @@
                 // Check win conditions
                 if (player.health <= 0 || aiPlayer.health <= 0) {
                     window.gameOver = true;
-                    winner = player.health > 0 ? 'PLAYER 1' : 'CPU';
+                    winner = player.health > 0 ? 'ELON MUSK' : 'CPU';
                 }
             }
             
