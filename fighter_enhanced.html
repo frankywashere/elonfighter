@@ -245,6 +245,9 @@
         let comboTimer = 0;
         let particles = [];
         let afterImages = [];
+        
+        // Testing toggle
+        let aiAttackDisabled = false;  // Toggle for disabling AI attacks (press '1')
 
         // Constants
         const GROUND_Y = 440;
@@ -253,7 +256,7 @@
         const WALK_SPEED_BACKWARD = 2.8;
         const JUMP_VELOCITY_Y = -22;  // Increased from -16 for higher jumps
         const JUMP_VELOCITY_X = 5.5;
-        const THROW_RANGE = 85;
+        const THROW_RANGE = 75;  // Increased from 60 to make throws more consistent
         const THROW_TECH_WINDOW = 7;
 
         // Input Manager - handles keyboard, touch, and gamepad inputs
@@ -292,6 +295,12 @@
                     // Restart game on ESC
                     if (key === 'escape' && window.gameOver) {
                         location.reload();
+                    }
+                    
+                    // Toggle AI attacks with '1' key
+                    if (key === '1') {
+                        aiAttackDisabled = !aiAttackDisabled;
+                        console.log('[DEBUG] AI attacks:', aiAttackDisabled ? 'DISABLED' : 'ENABLED');
                     }
                     
                     e.preventDefault();
@@ -812,6 +821,15 @@
                 this.spriteFrame = 0;
                 this.breathingOffset = 0;
                 
+                // Throw cooldown
+                this.throwCooldown = 0;
+                this.throwButtonsPressed = false;  // Track if throw buttons are held
+                
+                // Throw animation state
+                this.beingThrown = false;
+                this.throwAttacker = null;
+                this.throwAnimationFrame = 0;
+                
                 // Move state
                 this.currentMove = null;
                 this.moveFrame = 0;
@@ -819,6 +837,7 @@
                 this.blockstunFrames = 0;
                 this.knockdownFrames = 0;
                 this.invincibleFrames = 0;
+                this.rotation = 0;  // For throw spinning
                 
                 // Color scheme
                 this.skinColor = isPlayer ? '#f4c2a1' : '#f4c2a1';
@@ -852,6 +871,16 @@
                     this.breathingOffset = Math.sin(this.animTimer * 0.05) * 2;
                 }
                 
+                // Apply rotation for throw animation only when being thrown
+                if (this.rotation !== 0 && this.state === 'beingThrown') {
+                    ctx.translate(this.x, this.y - 50);
+                    ctx.rotate(this.rotation);
+                    ctx.translate(-this.x, -(this.y - 50));
+                } else if (this.rotation !== 0) {
+                    // Clean up any stuck rotation
+                    this.rotation = 0;
+                }
+                
                 // Flip for facing
                 if (this.facing === -1) {
                     ctx.translate(this.x, 0);
@@ -881,6 +910,10 @@
                 
                 if (this.state === 'knockdown' || this.knockdownFrames > 0) {
                     this.drawKnockdownSprite(baseY);
+                } else if (this.state === 'beingThrown') {
+                    this.drawBeingThrownSprite(baseY);
+                } else if (this.state === 'throwingOpponent') {
+                    this.drawThrowingSprite(baseY);
                 } else if (this.currentMove === 'shoryuken') {
                     this.drawShoryukenSprite(baseY);
                 } else if (this.currentMove === 'hadouken') {
@@ -1447,6 +1480,10 @@
             drawKnockdownSprite(baseY) {
                 // Horizontal knocked down position
                 ctx.save();
+                
+                // Ensure no rotation during knockdown
+                this.rotation = 0;
+                
                 ctx.translate(this.x, GROUND_Y);
                 
                 // Flatten on ground
@@ -1463,6 +1500,108 @@
                 ctx.fill();
                 
                 ctx.restore();
+            }
+            
+            drawBeingThrownSprite(baseY) {
+                // Victim being spun around - simplified sprite
+                // Head
+                ctx.fillStyle = this.skinColor;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y - 80, 15, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Body (stretched/distorted)
+                ctx.fillStyle = this.giColor;
+                ctx.save();
+                ctx.translate(this.x, this.y - 50);
+                ctx.scale(0.8, 1.2);
+                ctx.fillRect(-20, -20, 40, 40);
+                ctx.restore();
+                
+                // Limbs flailing
+                ctx.fillStyle = this.skinColor;
+                const flail = Math.sin(this.throwAnimationFrame * 0.5) * 20;
+                // Arms
+                ctx.fillRect(this.x - 35 + flail, this.y - 60, 15, 30);
+                ctx.fillRect(this.x + 20 - flail, this.y - 60, 15, 30);
+                // Legs
+                ctx.fillStyle = this.pantsColor;
+                ctx.fillRect(this.x - 20 + flail * 0.5, this.y - 30, 15, 30);
+                ctx.fillRect(this.x + 5 - flail * 0.5, this.y - 30, 15, 30);
+                
+                // Motion blur effect
+                ctx.globalAlpha = 0.3;
+                ctx.save();
+                ctx.translate(this.x, this.y - 50);
+                ctx.rotate(-this.rotation * 0.5);
+                ctx.fillStyle = this.giColor;
+                ctx.fillRect(-25, -25, 50, 50);
+                ctx.restore();
+                ctx.globalAlpha = 1;
+            }
+            
+            drawThrowingSprite(baseY) {
+                const progress = this.throwAnimationFrame / 30;
+                
+                // Head
+                ctx.fillStyle = this.skinColor;
+                ctx.beginPath();
+                ctx.arc(this.x - 5, baseY - 85, 15, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Body (leaning into throw)
+                ctx.fillStyle = this.giColor;
+                ctx.save();
+                ctx.translate(this.x, baseY - 50);
+                ctx.rotate(0.3 * (1 - progress)); // Lean forward then straighten
+                ctx.fillRect(-25, -20, 50, 40);
+                ctx.restore();
+                
+                // Throwing arm (gripping opponent)
+                ctx.fillStyle = this.skinColor;
+                const armAngle = -0.5 + progress * 1.5; // Swing over head
+                ctx.save();
+                ctx.translate(this.x + 10, baseY - 60);
+                ctx.rotate(armAngle);
+                ctx.fillRect(0, 0, 50, 20);
+                // Hand gripping
+                ctx.beginPath();
+                ctx.arc(50, 10, 10, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+                
+                // Other arm for balance
+                ctx.save();
+                ctx.translate(this.x - 10, baseY - 60);
+                ctx.rotate(0.7);
+                ctx.fillRect(-15, 0, 15, 40);
+                ctx.restore();
+                
+                // Legs in power stance
+                ctx.fillStyle = this.pantsColor;
+                // Back leg
+                ctx.fillRect(this.x - 25, baseY - 30, 20, 30);
+                // Front leg
+                ctx.save();
+                ctx.translate(this.x + 5, baseY - 30);
+                ctx.rotate(-0.2);
+                ctx.fillRect(0, 0, 20, 35);
+                ctx.restore();
+                
+                // Power lines for effect
+                if (this.throwAnimationFrame < 15) {
+                    ctx.strokeStyle = '#ffff00';
+                    ctx.lineWidth = 2;
+                    ctx.globalAlpha = 0.5;
+                    for (let i = 0; i < 3; i++) {
+                        const angle = i * 0.5 - 0.5;
+                        ctx.beginPath();
+                        ctx.moveTo(this.x, baseY - 50);
+                        ctx.lineTo(this.x + Math.cos(angle) * 40, baseY - 50 + Math.sin(angle) * 20);
+                        ctx.stroke();
+                    }
+                    ctx.globalAlpha = 1;
+                }
             }
 
             updateDrawing() {
@@ -1494,6 +1633,13 @@
             }
 
             handleInput(keys) {
+                // Don't process input during certain states
+                if (this.state === 'hitstun' || this.state === 'knockdown' || 
+                    this.knockdownFrames > 0 || this.state === 'throwingOpponent' || 
+                    this.state === 'beingThrown') {
+                    return;
+                }
+                
                 // Update directional inputs for special moves
                 // Skip if gamepad is active (gamepad handles its own directional inputs)
                 const gamepadActive = navigator.getGamepads && 
@@ -1626,10 +1772,53 @@
                     return;
                 }
                 
-                // Check for throw (LP + LK)
-                if (keys['u'] && keys['j'] && this.state !== 'attack' && this.grounded) {
-                    this.attemptThrow();
-                    return;
+                // Check for throw (any punch + any kick)
+                const anyPunch = keys['u'] || keys['i'];  // LP or HP
+                const anyKick = keys['j'] || keys['k'];   // LK or HK
+                
+                // Also check if punch or kick was pressed very recently (within 3 frames)
+                const recentPunch = this.inputBuffer.buttons.some(b => 
+                    (b.btn === 'LP' || b.btn === 'HP') && b.time < 3
+                );
+                const recentKick = this.inputBuffer.buttons.some(b => 
+                    (b.btn === 'LK' || b.btn === 'HK') && b.time < 3
+                );
+                
+                // Check if throw buttons are being pressed
+                const throwButtonsCurrentlyPressed = (anyPunch && anyKick) || (anyPunch && recentKick) || (anyKick && recentPunch);
+                
+                // Debug throw button state
+                if (this.isPlayer && (throwButtonsCurrentlyPressed || this.throwButtonsPressed)) {
+                    console.log('[THROW] Button state:', {
+                        currentlyPressed: throwButtonsCurrentlyPressed,
+                        previouslyPressed: this.throwButtonsPressed,
+                        canAttempt: throwButtonsCurrentlyPressed && !this.throwButtonsPressed
+                    });
+                }
+                
+                // Throw if both buttons pressed together OR within a small window
+                // BUT require button release between throw attempts
+                if (throwButtonsCurrentlyPressed && !this.throwButtonsPressed) {
+                    // Check if we can throw
+                    if (this.state !== 'attack' && this.state !== 'throwingOpponent' && 
+                        this.state !== 'beingThrown' && this.grounded && this.throwCooldown <= 0) {
+                        if (this.isPlayer) {
+                            console.log('[THROW] Attempting throw with punch+kick!');
+                        }
+                        this.attemptThrow();
+                        this.throwButtonsPressed = true;  // Mark buttons as pressed
+                        return;
+                    } else if (this.state === 'attack' && this.currentMove === 'throw') {
+                        // Already throwing, don't process other attacks
+                        this.throwButtonsPressed = true;  // Keep marking as pressed
+                    } else if (this.state === 'throwingOpponent') {
+                        // Already in throw animation, ignore inputs
+                        this.throwButtonsPressed = true;  // Keep marking as pressed
+                        return;
+                    }
+                } else if (!throwButtonsCurrentlyPressed) {
+                    // Buttons released - allow next throw attempt
+                    this.throwButtonsPressed = false;
                 }
                 
                 // Check for special moves first
@@ -1643,17 +1832,19 @@
                         console.log('[SPECIAL] Current buffer:', this.inputBuffer.directions.slice(-8).map(d => d.dir).join(''));
                     }
                     
-                    // Shoryuken (Dragon Punch motion)
-                    if (this.inputBuffer.checkMotion('623') && punchPressed) {
-                        console.log('[SPECIAL] SHORYUKEN TRIGGERED!');
-                        this.performSpecialMove('shoryuken');
-                        return;
-                    }
-                    
-                    // Hadouken (Quarter Circle Forward)
+                    // Check Hadouken first (Quarter Circle Forward)
+                    // This prevents false Shoryuken detection when doing back->hadouken
                     if (this.inputBuffer.checkMotion('236') && punchPressed) {
                         console.log('[SPECIAL] HADOUKEN TRIGGERED!');
                         this.performSpecialMove('hadouken');
+                        return;
+                    }
+                    
+                    // Shoryuken (Dragon Punch motion)
+                    // More strict - requires forward->down->down-forward without back input
+                    if (this.inputBuffer.checkMotion('623') && punchPressed) {
+                        console.log('[SPECIAL] SHORYUKEN TRIGGERED!');
+                        this.performSpecialMove('shoryuken');
                         return;
                     }
                     
@@ -1713,8 +1904,8 @@
                     }
                 }
                 
-                // Normal attacks - 4 BUTTON SYSTEM
-                if (this.state !== 'attack' || this.canCancelIntoNormal()) {
+                // Normal attacks - 4 BUTTON SYSTEM (respect throw cooldown)
+                if ((this.state !== 'attack' || this.canCancelIntoNormal()) && this.throwCooldown <= 0) {
                     if (!this.grounded) {
                         // Jumping attacks
                         if (keys['u']) this.attack('jLP');
@@ -1829,19 +2020,33 @@
             }
 
             attemptThrow() {
+                // Don't attempt if already throwing
+                if (this.state === 'throwingOpponent' || this.state === 'beingThrown') {
+                    return;
+                }
+                
                 const opponent = this.isPlayer ? aiPlayer : player;
                 const distance = Math.abs(this.x - opponent.x);
                 
-                if (distance < THROW_RANGE && opponent.grounded && !opponent.knockdownFrames) {
-                    this.state = 'attack';
-                    this.currentMove = 'throw';
-                    this.moveFrame = 0;
-                    this.blocking = false;  // Clear blocking when attacking
-                    this.isThrowAttempt = true;
-                    
-                    // Give opponent tech window
-                    opponent.throwTechWindow = THROW_TECH_WINDOW;
+                // Always start throw animation
+                this.state = 'attack';
+                this.currentMove = 'throw';
+                this.moveFrame = 0;
+                this.currentMoveHits = 0;  // Reset hit counter - CRITICAL for collision detection
+                this.lastHitFrame = -999;  // Reset last hit frame
+                this.blocking = false;  // Clear blocking when attacking
+                this.isThrowAttempt = true;
+                this.throwCooldown = 60; // Longer cooldown to prevent spam
+                
+                // Step forward slightly during throw startup (first 3 frames)
+                const stepForward = distance > 60 && distance < THROW_RANGE;
+                if (stepForward) {
+                    // Move toward opponent during startup
+                    const direction = opponent.x > this.x ? 1 : -1;
+                    this.velocityX = direction * 2; // Small step forward
                 }
+                
+                // Don't set tech window here - let collision detection handle it
             }
 
             canCancelIntoNormal() {
@@ -1872,20 +2077,60 @@
                     this.hurtboxes.push({ x: -25, y: -100, width: 50, height: 100 });
                 }
                 
-                // Attack hitboxes
-                if (this.state === 'attack' && this.currentMove) {
+                // Attack hitboxes - don't generate during throwing animation
+                if (this.state === 'attack' && this.currentMove && this.state !== 'throwingOpponent') {
                     const frameData = FRAME_DATA[this.currentMove];
-                    if (this.moveFrame >= frameData.startup && 
+                    if (frameData && this.moveFrame >= frameData.startup && 
                         this.moveFrame < frameData.startup + frameData.active) {
                         
                         if (this.currentMove === 'throw') {
-                            this.hitboxes.push({
-                                x: this.facing === 1 ? 10 : -60,
-                                y: -80,
-                                width: 50,
-                                height: 60,
-                                type: 'throw'
-                            });
+                            // Check distance again during active frames
+                            const opponent = this.isPlayer ? aiPlayer : player;
+                            const distance = Math.abs(this.x - opponent.x);
+                            
+                            if (this.isPlayer) {
+                                console.log('[THROW] Active frame check:', {
+                                    frame: this.moveFrame,
+                                    distance: distance,
+                                    inRange: distance < THROW_RANGE,
+                                    opponentGrounded: opponent.grounded
+                                });
+                            }
+                            
+                            // Only create throw hitbox if in range and opponent is throwable
+                            if (distance < THROW_RANGE && opponent.grounded && !opponent.knockdownFrames) {
+                                // Position throw hitbox based on opponent's position
+                                const opponentDirection = opponent.x > this.x ? 1 : -1;
+                                
+                                if (this.isPlayer) {
+                                    console.log('[THROW] Opponent direction:', {
+                                        playerX: this.x,
+                                        opponentX: opponent.x,
+                                        opponentIsToTheRight: opponentDirection === 1
+                                    });
+                                }
+                                
+                                const throwHitbox = {
+                                    x: opponentDirection === 1 ? 10 : -80,  // Hitbox toward opponent
+                                    y: -80,
+                                    width: 80,  // Wide hitbox
+                                    height: 80,  // Tall hitbox
+                                    type: 'throw'
+                                };
+                                
+                                this.hitboxes.push(throwHitbox);
+                                
+                                if (this.isPlayer) {
+                                    console.log('[THROW] Hitbox created!', {
+                                        x: throwHitbox.x,
+                                        y: throwHitbox.y,
+                                        width: throwHitbox.width,
+                                        height: throwHitbox.height,
+                                        fighterX: this.x,
+                                        opponentX: opponent.x
+                                    });
+                                }
+                            }
                         } else if (this.currentMove.includes('P') || this.currentMove.includes('punch')) {
                             // Punch hitboxes
                             let reach = 50;
@@ -1930,36 +2175,141 @@
                 // Update invincibility
                 if (this.invincibleFrames > 0) this.invincibleFrames--;
                 
-                // Update throw tech window
-                if (this.throwTechWindow > 0) {
-                    this.throwTechWindow--;
-                    // Check for tech input
-                    if (this.throwTechWindow > 0 && this.inputBuffer.checkButton('throw')) {
-                        // Successful tech
-                        this.pushbackVelocity = -this.facing * 3;
-                        this.throwTechWindow = 0;
-                    }
+                // Clean up stuck beingThrown state (but not during active throw)
+                if (this.beingThrown && this.state !== 'beingThrown' && 
+                    (!this.throwAttacker || this.throwAttacker.state !== 'throwingOpponent')) {
+                    console.log('[THROW] Cleaning up stuck beingThrown state', {
+                        beingThrown: this.beingThrown,
+                        state: this.state,
+                        throwAttacker: this.throwAttacker ? this.throwAttacker.state : 'null'
+                    });
+                    this.beingThrown = false;
+                    this.throwAttacker = null;
+                    this.throwAnimationFrame = 0;
                 }
                 
-                // Update stun states
-                if (this.hitstunFrames > 0) {
-                    this.hitstunFrames--;
-                    this.state = 'hitstun';
-                } else if (this.blockstunFrames > 0) {
-                    this.blockstunFrames--;
-                    this.state = 'blockstun';
-                } else if (this.knockdownFrames > 0) {
-                    this.knockdownFrames--;
-                    this.state = 'knockdown';
-                    if (this.knockdownFrames === 0) {
-                        this.state = 'idle';
-                        this.y = GROUND_Y;
+                // Decrement cooldowns
+                if (this.throwCooldown > 0) this.throwCooldown--;
+                
+                // Handle being thrown animation
+                if (this.state === 'beingThrown' && this.throwAttacker) {
+                    this.throwAnimationFrame++;
+                    
+                    if (this.isPlayer) {
+                        console.log('[THROW] Being thrown animation frame:', this.throwAnimationFrame);
                     }
-                } else if (this.isDizzy) {
-                    this.state = 'dizzy';
-                } else if (this.state === 'hitstun' || this.state === 'blockstun') {
-                    // Reset to idle if we were in hitstun/blockstun but frames are 0
-                    this.state = 'idle';
+                    
+                    // Stick to attacker during throw
+                    const throwDuration = 30;
+                    if (this.throwAnimationFrame < throwDuration) {
+                        // Determine throw direction based on available space
+                        const distanceToLeftWall = this.throwAttacker.x;
+                        const distanceToRightWall = canvas.width - this.throwAttacker.x;
+                        const throwDirection = distanceToLeftWall > distanceToRightWall ? -1 : 1;
+                        
+                        // Position victim relative to attacker
+                        const progress = this.throwAnimationFrame / throwDuration;
+                        
+                        // Graceful arc motion - like a judo throw
+                        const liftHeight = Math.sin(progress * Math.PI) * 60;  // Moderate lift
+                        const arcMotion = Math.sin(progress * Math.PI) * 20;  // Smooth arc
+                        const offsetX = throwDirection * (30 + progress * 80);  // Reasonable distance
+                        
+                        this.x = this.throwAttacker.x + offsetX;
+                        this.y = this.throwAttacker.y - 50 - liftHeight;
+                        
+                        // Store throw direction for launch
+                        this.throwDirection = throwDirection;
+                        
+                        // Gentle rotation - just one flip
+                        this.rotation = progress * Math.PI * 2;  // One graceful rotation
+                    } else {
+                        // Throw complete - launch the victim gracefully
+                        console.log('[THROW] Launch phase!', {
+                            victim: this.isPlayer ? 'PLAYER' : 'AI',
+                            throwDirection: this.throwDirection,
+                            velocityBefore: this.velocityX
+                        });
+                        
+                        this.state = 'knockdown';
+                        this.knockdownFrames = 50;  // Reasonable knockdown time
+                        this.velocityY = -12;  // Clean arc
+                        this.velocityX = (this.throwDirection || 1) * 50;  // Half screen distance
+                        this.pushbackVelocity = 0;
+                        this.rotation = 0;
+                        this.beingThrown = false;
+                        
+                        console.log('[THROW] Launch velocities set!', {
+                            velocityX: this.velocityX,
+                            velocityY: this.velocityY,
+                            state: this.state
+                        });
+                        
+                        // Apply throw damage
+                        this.takeDamage(12, 0, 0, 0, true, this.throwAttacker);
+                        
+                        // Create impact particles for dramatic effect
+                        for (let i = 0; i < 8; i++) {
+                            particles.push(new Particle(
+                                this.x + (Math.random() - 0.5) * 40,
+                                this.y - 50,
+                                'impact'
+                            ));
+                        }
+                        
+                        // Clear throw reference
+                        this.throwAttacker = null;
+                        
+                        // Screen shake for impact
+                        screenShake = 6;  // Moderate screen shake
+                    }
+                    return; // Skip normal physics
+                }
+                
+                // Handle throwing animation
+                if (this.state === 'throwingOpponent') {
+                    this.throwAnimationFrame++;
+                    
+                    if (this.isPlayer) {
+                        console.log('[THROW] Throwing animation frame:', this.throwAnimationFrame);
+                    }
+                    
+                    if (this.throwAnimationFrame >= 30) {
+                        // Animation complete
+                        this.state = 'idle';
+                        this.currentMove = null;
+                        this.throwAnimationFrame = 0;
+                        this.throwCooldown = 20; // Add cooldown after throw completes
+                        
+                        // Don't reset opponent here - let their beingThrown animation complete naturally
+                    }
+                    return; // Skip normal attack processing
+                }
+                
+                // Update stun states - but not if being thrown
+                if (this.state !== 'beingThrown' && this.state !== 'throwingOpponent') {
+                    if (this.hitstunFrames > 0) {
+                        this.hitstunFrames--;
+                        this.state = 'hitstun';
+                    } else if (this.blockstunFrames > 0) {
+                        this.blockstunFrames--;
+                        this.state = 'blockstun';
+                    } else if (this.knockdownFrames > 0) {
+                        this.knockdownFrames--;
+                        this.state = 'knockdown';
+                        if (this.knockdownFrames === 0) {
+                            this.state = 'idle';
+                            this.y = GROUND_Y;
+                            this.rotation = 0;  // Reset rotation after knockdown
+                        }
+                    } else if (this.isDizzy) {
+                        this.state = 'dizzy';
+                        this.rotation = 0;  // Reset rotation
+                    } else if (this.state === 'hitstun' || this.state === 'blockstun') {
+                        // Reset to idle if we were in hitstun/blockstun but frames are 0
+                        this.state = 'idle';
+                        this.rotation = 0;  // Reset rotation
+                    }
                 }
                 
                 // Update dizzy state
@@ -2046,9 +2396,12 @@
                     this.grounded = false;
                 }
                 
-                // Friction
+                // Friction (but not during throw startup to allow stepping forward)
                 if (this.grounded) {
-                    this.velocityX *= 0.85;
+                    // Don't apply friction during throw startup frames
+                    if (!(this.currentMove === 'throw' && this.moveFrame < 3)) {
+                        this.velocityX *= 0.85;
+                    }
                 }
                 this.pushbackVelocity *= 0.9;
                 
@@ -2107,6 +2460,20 @@
             }
 
             endAttack() {
+                // If we just finished a throw attempt, add a small cooldown
+                if (this.currentMove === 'throw') {
+                    this.throwCooldown = 10;  // Prevent immediate attacks after throw
+                    
+                    // Reset any stuck beingThrown state on the opponent
+                    const opponent = this.isPlayer ? aiPlayer : player;
+                    if (opponent.beingThrown && opponent.state !== 'beingThrown') {
+                        console.log('[THROW] Resetting stuck beingThrown flag on opponent');
+                        opponent.beingThrown = false;
+                        opponent.throwAttacker = null;
+                        opponent.throwAnimationFrame = 0;
+                    }
+                }
+                
                 this.state = 'idle';
                 this.currentMove = null;
                 this.moveFrame = 0;
@@ -2585,32 +2952,39 @@
                 // Additional leniency for gamepad - allow intermediate directions
                 // But be more strict to prevent false positives
                 if (motion === '236') {
-                    // Hadouken - must have down->forward motion in sequence
-                    // Check last 8 inputs for the pattern (more lenient)
+                    // Hadouken - down->down-forward->forward motion
+                    // Check last 8 inputs for the pattern
                     const recentStr = recent.slice(-8).map(d => d.dir).join('');
-                    // Allow the motion anywhere in recent inputs, not just at end
-                    if (recentStr.includes('236') ||     // Direct motion
-                        recentStr.match(/2[35]+6/) ||     // With diagonals
-                        recentStr.match(/2[14]?3+6/) ||   // Allow some back input
-                        cleanedMotion.includes('236')) {  // Clean motion anywhere
+                    
+                    // Match Hadouken patterns
+                    if (recentStr.includes('236') ||           // Direct motion
+                        recentStr.match(/2[35]*6/) ||          // With optional diagonal
+                        recentStr.match(/[14]?2[35]*6/) ||     // Allow back->down->forward (common in quarter circles)
+                        cleanedMotion.includes('236')) {       // Clean motion anywhere
                         console.log('[INPUT] Hadouken motion matched with gamepad leniency!');
                         return true;
                     }
                 } else if (motion === '623') {
-                    // Shoryuken - forward->down->down-forward, more strict
-                    const recentStr = recent.slice(-5).map(d => d.dir).join('');
-                    if (recentStr.match(/6[25]?3$/) ||   // Ends with 623 pattern
-                        recentStr.match(/62[35]$/) ||     // With variations
-                        cleanedMotion.slice(-3).match(/623/)) {  // Clean motion at end
+                    // Shoryuken - forward->down->down-forward (dragon punch)
+                    // Must be more strict - no back input before the motion
+                    const recentStr = recent.slice(-6).map(d => d.dir).join('');
+                    
+                    // Check if we have a proper Shoryuken motion
+                    // Must NOT have back (4) immediately before the 623 motion
+                    if (recentStr.match(/6[25]?3$/) ||         // Ends with proper 623
+                        (recentStr.match(/[^4]623/) && !recentStr.match(/4.*623/)) ||  // Has 623 but no 4 before it
+                        (recentStr === '623')) {                // Exact motion
                         console.log('[INPUT] Shoryuken motion matched with gamepad leniency!');
                         return true;
                     }
                 } else if (motion === '214') {
-                    // Tatsumaki - down->back motion
-                    const recentStr = recent.slice(-6).map(d => d.dir).join('');
-                    if (recentStr.match(/2[15]?4$/) ||   // Ends with the motion
-                        recentStr.match(/21[45]$/) ||     // With diagonal
-                        cleanedMotion.slice(-3).match(/214/)) {  // Clean motion at end
+                    // Tatsumaki - down->down-back->back motion
+                    const recentStr = recent.slice(-8).map(d => d.dir).join('');
+                    
+                    if (recentStr.includes('214') ||           // Direct motion anywhere
+                        recentStr.match(/2[15]*4/) ||          // With optional diagonal
+                        recentStr.match(/[36]?2[15]*4/) ||     // Allow forward->down->back
+                        cleanedMotion.includes('214')) {       // Clean motion anywhere
                         console.log('[INPUT] Tatsumaki motion matched with gamepad leniency!');
                         return true;
                     }
@@ -2642,6 +3016,34 @@
             update(player) {
                 if (this.reactionTimer > 0) {
                     this.reactionTimer--;
+                    return;
+                }
+                
+                // Check if AI attacks are disabled for testing
+                if (aiAttackDisabled) {
+                    // AI won't attack or block - stands still like a training dummy
+                    const distance = Math.abs(this.fighter.x - player.x);
+                    
+                    // Disable blocking completely
+                    this.fighter.blocking = false;
+                    
+                    // Just stand still - no movement at all
+                    // This makes it easier to test throws and combos
+                    // BUT don't override velocity during knockdown or being thrown!
+                    if (this.fighter.state !== 'knockdown' && 
+                        this.fighter.state !== 'beingThrown' &&
+                        this.fighter.state !== 'hitstun') {
+                        this.fighter.velocityX = 0;
+                    }
+                    
+                    // Only set to idle if not in a special state
+                    if (this.fighter.state !== 'beingThrown' && 
+                        this.fighter.state !== 'throwingOpponent' &&
+                        this.fighter.state !== 'knockdown' &&
+                        this.fighter.state !== 'hitstun') {
+                        this.fighter.state = 'idle';
+                    }
+                    
                     return;
                 }
                 
@@ -2793,6 +3195,21 @@
             [player, aiPlayer].forEach((attacker, i) => {
                 const defender = i === 0 ? aiPlayer : player;
                 
+                // Skip collision checks during throw animations
+                if (attacker.state === 'throwingOpponent' || defender.state === 'beingThrown') {
+                    return;
+                }
+                
+                // Debug throw hitboxes
+                if (attacker.isPlayer && attacker.currentMove === 'throw' && attacker.hitboxes.length > 0) {
+                    console.log('[THROW] Checking collisions:', {
+                        attackerHitboxes: attacker.hitboxes.length,
+                        defenderHurtboxes: defender.hurtboxes.length,
+                        defenderState: defender.state,
+                        defenderGrounded: defender.grounded
+                    });
+                }
+                
                 // Regular attacks
                 attacker.hitboxes.forEach(hitbox => {
                     defender.hurtboxes.forEach(hurtbox => {
@@ -2809,6 +3226,21 @@
                             height: hurtbox.height
                         };
                         
+                        // Debug throw collision
+                        if (hitbox.type === 'throw' && attacker.isPlayer) {
+                            const xOverlap = hit1.x < hurt2.x + hurt2.width && hit1.x + hit1.width > hurt2.x;
+                            const yOverlap = hit1.y < hurt2.y + hurt2.height && hit1.y + hit1.height > hurt2.y;
+                            console.log('[THROW] Collision check:', {
+                                hitbox: `x:${hit1.x}, y:${hit1.y}, w:${hit1.width}, h:${hit1.height}`,
+                                hurtbox: `x:${hurt2.x}, y:${hurt2.y}, w:${hurt2.width}, h:${hurt2.height}`,
+                                overlap: {
+                                    x: xOverlap,
+                                    y: yOverlap,
+                                    bothAxes: xOverlap && yOverlap
+                                }
+                            });
+                        }
+                        
                         if (hit1.x < hurt2.x + hurt2.width &&
                             hit1.x + hit1.width > hurt2.x &&
                             hit1.y < hurt2.y + hurt2.height &&
@@ -2816,6 +3248,20 @@
                             
                             // Hit confirmed
                             const moveData = FRAME_DATA[attacker.currentMove];
+                            
+                            // Skip if no move data (move was cleared)
+                            if (!moveData) {
+                                return;
+                            }
+                            
+                            // Debug for throws
+                            if (hitbox.type === 'throw' && attacker.isPlayer) {
+                                console.log('[THROW] HIT CONFIRMED! Checking canHit...', {
+                                    currentMoveHits: attacker.currentMoveHits,
+                                    moveData: moveData
+                                });
+                            }
+                            
                             const maxHits = moveData.hits || 1;
                             
                             // Check if we can hit again
@@ -2832,15 +3278,63 @@
                                 }
                             }
                             
+                            // More debug for throws
+                            if (hitbox.type === 'throw' && attacker.isPlayer) {
+                                console.log('[THROW] canHit result:', canHit);
+                            }
+                            
                             if (canHit) {
-                                if (hitbox.type === 'throw' && defender.throwTechWindow <= 0) {
-                                    // Successful throw
-                                    defender.beingThrown = true;
-                                    defender.knockdownFrames = 40;
-                                    defender.velocityY = -6;
-                                    defender.pushbackVelocity = -defender.facing * 8;
-                                    defender.takeDamage(moveData.damage, 0, 0, 0, true, attacker);
-                                } else if (hitbox.type !== 'throw') {
+                                if (hitbox.type === 'throw') {
+                                    // Debug all throw conditions
+                                    if (attacker.isPlayer) {
+                                        console.log('[THROW] Checking throw conditions:', {
+                                            beingThrown: defender.beingThrown,
+                                            grounded: defender.grounded,
+                                            state: defender.state,
+                                            knockdownFrames: defender.knockdownFrames,
+                                            canBeThrown: !defender.beingThrown && defender.grounded && 
+                                                defender.state !== 'knockdown' && defender.knockdownFrames <= 0 &&
+                                                defender.state !== 'attack'
+                                        });
+                                    }
+                                    
+                                    // Check if opponent can be thrown
+                                    if (!defender.beingThrown && defender.grounded && 
+                                        defender.state !== 'knockdown' && defender.knockdownFrames <= 0 &&
+                                        defender.state !== 'attack') {
+                                        
+                                        // First, clear any previous throw state
+                                        defender.beingThrown = false;
+                                        defender.throwAttacker = null;
+                                        defender.throwAnimationFrame = 0;
+                                        
+                                        // Successful throw - instant execution for simplicity
+                                        console.log('[THROW] SUCCESS! Throwing opponent');
+                                        defender.beingThrown = true;
+                                        defender.throwAttacker = attacker;
+                                        defender.throwAnimationFrame = 0;
+                                        defender.state = 'beingThrown';
+                                        defender.velocityX = 0;
+                                        defender.velocityY = 0;
+                                        
+                                        // Attacker enters throw state
+                                        attacker.state = 'throwingOpponent';
+                                        attacker.throwAnimationFrame = 0;
+                                        attacker.moveFrame = 0; // Reset move frame
+                                        
+                                        // Clear attack state and hitboxes to prevent further collisions
+                                        attacker.currentMove = null;
+                                        attacker.isThrowAttempt = false;
+                                        attacker.hitboxes = [];  // Clear all hitboxes immediately
+                                        
+                                        // Track successful throw hit
+                                        attacker.currentMoveHits++;
+                                        attacker.lastHitFrame = attacker.moveFrame;
+                                        
+                                        // Don't apply damage yet - wait for the slam
+                                    }
+                                    // Don't track hit here - let it fall through to avoid double-counting
+                                } else {
                                     // Normal hit
                                     defender.takeDamage(
                                         moveData.damage,
@@ -2850,16 +3344,16 @@
                                         moveData.knockdown,
                                         attacker
                                     );
+                                    
+                                    // Track normal hit
+                                    attacker.currentMoveHits++;
+                                    attacker.lastHitFrame = attacker.moveFrame;
+                                    attacker.lastHit = attacker.currentMove + attacker.moveFrame;
+                                    
+                                    // Build super meter for normal attacks
+                                    attacker.superMeter = Math.min(attacker.maxSuper, 
+                                        attacker.superMeter + moveData.damage * 0.5);
                                 }
-                                
-                                // Track the hit
-                                attacker.currentMoveHits++;
-                                attacker.lastHitFrame = attacker.moveFrame;
-                                attacker.lastHit = attacker.currentMove + attacker.moveFrame;
-                                
-                                // Build super meter
-                                attacker.superMeter = Math.min(attacker.maxSuper, 
-                                    attacker.superMeter + moveData.damage * 0.5);
                             }
                         }
                     });
