@@ -5,8 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, minimal-ui">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<<<<<<<< HEAD:fighter_enhanced.html
+========
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="format-detection" content="telephone=no">
+>>>>>>>> main:index.html
     <title>Street Fighter II - Enhanced Graphics</title>
     <style>
         body {
@@ -20,17 +23,24 @@
             font-family: 'Courier New', monospace;
             overflow: hidden;
             /* Support for Safari safe areas */
+<<<<<<<< HEAD:fighter_enhanced.html
+            padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+========
             padding-top: env(safe-area-inset-top);
             padding-right: env(safe-area-inset-right);
             padding-bottom: env(safe-area-inset-bottom);
             padding-left: env(safe-area-inset-left);
+>>>>>>>> main:index.html
             /* Fullscreen support */
             position: fixed;
             width: 100%;
             height: 100%;
+<<<<<<<< HEAD:fighter_enhanced.html
+========
             /* Prevent bouncing on iOS */
             -webkit-overflow-scrolling: touch;
             overscroll-behavior: none;
+>>>>>>>> main:index.html
         }
         #gameContainer {
             position: relative;
@@ -224,16 +234,45 @@
             
             /* Canvas sizing is handled by JavaScript resizeCanvas function */
         }
+        
+        /* Standalone mode (PWA) specific styles */
+        @media (display-mode: standalone) {
+            body {
+                /* Use safe area padding in standalone mode */
+                padding-top: max(env(safe-area-inset-top), 20px);
+                padding-right: max(env(safe-area-inset-right), 0px);
+                padding-bottom: max(env(safe-area-inset-bottom), 0px);
+                padding-left: max(env(safe-area-inset-left), 0px);
+            }
+            
+            #gameContainer {
+                /* Ensure full coverage in standalone mode */
+                position: fixed !important;
+                top: 0;
+                left: 0;
+                width: 100vw;
+                height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+        }
+        
+        /* iOS Safari standalone mode detection */
+        @supports (-webkit-touch-callout: none) {
+            @media (display-mode: standalone) {
+                body {
+                    /* iOS specific safe area handling */
+                    padding-top: max(env(safe-area-inset-top), env(titlebar-area-height, 44px));
+                }
+            }
+        }
     </style>
 </head>
 <body>
     <div id="gameContainer">
         <canvas id="gameCanvas"></canvas>
         <div class="combo-display" id="comboDisplay"></div>
-        <div class="controls">
-            Movement: A/D (walk), S (crouch), W+A/D (jump) | Punch: U/I/O | Kick: J/K/L | Throw: I+K | Block: Hold back<br>
-            Elon: Flamethrower ↓↘→ + Punch | Trump: Hadouken ↓↘→ + Punch | Shoryuken: →↓↘ + Punch | Tatsumaki: ↓↙← + Kick
-        </div>
         
         <!-- Mobile Controls -->
         <div class="mobile-controls" id="mobileControls">
@@ -262,16 +301,30 @@
         
         // Responsive canvas sizing
         function resizeCanvas() {
+            // Detect if running as PWA (standalone mode)
+            const isStandalone = window.navigator.standalone || 
+                                window.matchMedia('(display-mode: standalone)').matches ||
+                                window.matchMedia('(display-mode: fullscreen)').matches;
+            
             // Get available space accounting for safe areas and canvas border
             const borderWidth = 8; // 4px border on each side
-            const availableWidth = window.innerWidth - 
-                parseInt(getComputedStyle(document.body).paddingLeft) - 
-                parseInt(getComputedStyle(document.body).paddingRight) - 
-                borderWidth;
-            const availableHeight = window.innerHeight - 
-                parseInt(getComputedStyle(document.body).paddingTop) - 
-                parseInt(getComputedStyle(document.body).paddingBottom) - 
-                borderWidth;
+            let availableWidth, availableHeight;
+            
+            if (isStandalone) {
+                // In standalone mode, use full viewport and let CSS handle safe areas
+                availableWidth = window.innerWidth - borderWidth;
+                availableHeight = window.innerHeight - borderWidth;
+            } else {
+                // In browser mode, account for body padding from safe areas
+                availableWidth = window.innerWidth - 
+                    parseInt(getComputedStyle(document.body).paddingLeft) - 
+                    parseInt(getComputedStyle(document.body).paddingRight) - 
+                    borderWidth;
+                availableHeight = window.innerHeight - 
+                    parseInt(getComputedStyle(document.body).paddingTop) - 
+                    parseInt(getComputedStyle(document.body).paddingBottom) - 
+                    borderWidth;
+            }
             
             // Calculate scale to fit screen while maintaining aspect ratio
             const scaleX = availableWidth / BASE_WIDTH;
@@ -282,8 +335,8 @@
             const finalWidth = BASE_WIDTH * gameScale;
             const finalHeight = BASE_HEIGHT * gameScale;
             
-            // Debug logging
             console.log('Canvas Resize Debug:', {
+                isStandalone,
                 windowSize: `${window.innerWidth}x${window.innerHeight}`,
                 availableSize: `${availableWidth}x${availableHeight}`,
                 baseSize: `${BASE_WIDTH}x${BASE_HEIGHT}`,
@@ -297,12 +350,29 @@
             canvas.style.width = finalWidth + 'px';
             canvas.style.height = finalHeight + 'px';
             
-            // Center the canvas
+            // Improved centering for standalone mode
             const gameContainer = document.getElementById('gameContainer');
-            gameContainer.style.position = 'absolute';
-            gameContainer.style.left = '50%';
-            gameContainer.style.top = '50%';
-            gameContainer.style.transform = 'translate(-50%, -50%)';
+            if (isStandalone) {
+                // Use flexbox centering for better reliability in standalone mode
+                gameContainer.style.position = 'fixed';
+                gameContainer.style.top = '0';
+                gameContainer.style.left = '0';
+                gameContainer.style.width = '100vw';
+                gameContainer.style.height = '100vh';
+                gameContainer.style.display = 'flex';
+                gameContainer.style.alignItems = 'center';
+                gameContainer.style.justifyContent = 'center';
+                gameContainer.style.transform = 'none';
+            } else {
+                // Use absolute positioning for browser mode
+                gameContainer.style.position = 'absolute';
+                gameContainer.style.left = '50%';
+                gameContainer.style.top = '50%';
+                gameContainer.style.transform = 'translate(-50%, -50%)';
+                gameContainer.style.display = 'block';
+                gameContainer.style.width = 'auto';
+                gameContainer.style.height = 'auto';
+            }
             
             // Re-enable image smoothing after resize
             ctx.imageSmoothingEnabled = false;
