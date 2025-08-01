@@ -117,5 +117,12 @@
     "final_size": "562x509",
     "scale_factor": 0.62,
     "canvas_size": "1092x873"
+  },
+  "powermove-1": {
+    "original_size": "1024x1536",
+    "crop_size": "886x895",
+    "final_size": "720x728",
+    "scale_factor": 0.81,
+    "canvas_size": "1092x873"
   }
 }

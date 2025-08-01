@@ -212,7 +212,7 @@
         <div class="combo-display" id="comboDisplay"></div>
         <div class="controls">
             Movement: A/D (walk), S (crouch), W+A/D (jump) | Punch: U/I/O | Kick: J/K/L | Throw: I+K | Block: Hold back<br>
-            Hadouken: ↓↘→ + Punch | Shoryuken: →↓↘ + Punch | Tatsumaki: ↓↙← + Kick
+            Elon: Flamethrower ↓↘→ + Punch | Trump: Hadouken ↓↘→ + Punch | Shoryuken: →↓↘ + Punch | Tatsumaki: ↓↙← + Kick
         </div>
         
         <!-- Mobile Controls -->
@@ -310,7 +310,9 @@
                             'beingThrown': 'thrown.png',
                             'throwingOpponent': 'punch2.png',  // Using punch2 for throw
                             'dizzy': 'hit.png',  // Use hit sprite for dizzy
-                            'hitstun': 'hit.png'  // Use hit sprite for hitstun
+                            'hitstun': 'hit.png',  // Use hit sprite for hitstun
+                            'hadouken': 'powermove-1.png',  // Flamethrower sprite
+                            'flamethrower': 'powermove-1.png'  // Alias
                         }
                     },
                     'trump': {
@@ -334,7 +336,8 @@
                             'knockdown': 'thrown.png',  // Use thrown sprite for knockdown
                             'beingThrown': 'thrown.png',
                             'dizzy': 'hit.png',  // Use hit for dizzy
-                            'hitstun': 'hit.png'  // Use hit for hitstun
+                            'hitstun': 'hit.png',  // Use hit for hitstun
+                            'hadouken': 'punch-standing.png'  // Use punch sprite for hadouken
                         }
                     }
                 };
@@ -1224,7 +1227,7 @@
                     } else if (this.state === 'attack' && this.currentMove) {
                         // Handle special moves - only if we're actually in attack state AND have a move
                         if (this.currentMove === 'hadouken') {
-                            spriteState = 'P';  // Use punch sprite for hadouken
+                            spriteState = 'hadouken';  // Use special hadouken/flamethrower sprite
                         } else if (this.currentMove === 'shoryuken') {
                             spriteState = 'jP';  // Use jump punch for shoryuken
                         } else if (this.currentMove === 'tatsumaki') {
@@ -2866,14 +2869,22 @@
                     
                     // Spawn projectile for hadouken
                     if (this.currentMove === 'hadouken' && this.moveFrame === frameData.startup) {
-                        // Spawn from fist position
-                        // When punching forward, fist is extended forward and at shoulder height
-                        const fistOffsetX = this.facing * 45;  // Extended arm reach
-                        const fistOffsetY = -110;  // Higher up - at actual fist height on the sprite
+                        let spawnX, spawnY;
+                        
+                        if (this.characterName === 'elon') {
+                            // Flamethrower spawn position - from gun barrel
+                            // Gun extends far forward at hip level
+                            spawnX = this.x + (this.facing * 120);  // Gun barrel extends far forward
+                            spawnY = this.y - 150;  // Adjusted 80 pixels higher total for correct barrel position
+                        } else {
+                            // Regular hadouken spawn position - from hands
+                            spawnX = this.x + (this.facing * 45);
+                            spawnY = this.y - 110;
+                        }
                         
                         this.projectiles.push(new Projectile(
-                            this.x + fistOffsetX,
-                            this.y + fistOffsetY,
+                            spawnX,
+                            spawnY,
                             this.facing,
                             this,
                             frameData
@@ -3441,7 +3452,10 @@
                             'crP': 'crouch-punch',
                             'crK': 'crouch-kick',
                             'jP': 'jumppunch-elon',
-                            'jK': 'jump-kick'
+                            'jK': 'jump-kick',
+                            'hadouken': 'hadouken',  // Maps to powermove-1.png for Elon
+                            'shoryuken': 'punch',    // Use punch sprite for shoryuken
+                            'tatsumaki': 'kick-standing'  // Use kick sprite for tatsumaki
                         };
                         spriteState = moveSpriteMap[this.currentMove] || this.currentMove;
                     }
@@ -3451,78 +3465,182 @@
             }
         }
 
-        // Enhanced Projectile class
+        // Flame particle for flamethrower
+        class FlameParticle {
+            constructor(x, y, facing) {
+                this.x = x;
+                this.y = y;
+                this.facing = facing;
+                this.velocity = facing * (10 + Math.random() * 5);
+                this.life = 25 + Math.random() * 15;
+                this.maxLife = this.life;
+                this.size = 10 + Math.random() * 15;
+                this.yVel = (Math.random() - 0.5) * 3;
+                this.color = Math.random() < 0.6 ? '#ff6600' : (Math.random() < 0.5 ? '#ffaa00' : '#ffdd00');
+            }
+
+            update() {
+                this.x += this.velocity;
+                this.y += this.yVel;
+                this.yVel -= 0.15; // Flames rise
+                this.life--;
+                this.velocity *= 0.97; // Slow down
+                this.size *= 0.98; // Shrink
+            }
+
+            draw() {
+                const alpha = this.life / this.maxLife;
+                ctx.save();
+                ctx.globalAlpha = alpha * 0.8;
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.fillStyle = this.color;
+                const currentSize = this.size;
+                
+                // Draw flame with glow
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, currentSize, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Inner bright core
+                ctx.globalAlpha = alpha * 0.6;
+                ctx.fillStyle = '#ffffcc';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, currentSize * 0.5, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.restore();
+            }
+        }
+
+        // Enhanced Projectile class (supports both flamethrower and hadouken)
         class Projectile {
             constructor(x, y, facing, owner, moveData) {
                 this.x = x;
                 this.y = y;
                 this.facing = facing;
                 this.owner = owner;
-                this.velocity = facing * 10;
                 this.moveData = moveData;
                 this.active = true;
-                this.hitbox = { x: -25, y: -25, width: 50, height: 50 };
-                this.rotation = 0;
+                this.isFlamethrower = owner.characterName === 'elon'; // Only Elon has flamethrower
+                
+                if (this.isFlamethrower) {
+                    // Flamethrower properties
+                    this.particles = [];
+                    this.duration = 35;
+                    this.hitbox = { x: facing === 1 ? 0 : -150, y: -40, width: 150, height: 80 };
+                    this.particleSpawnTimer = 0;
+                    this.hitCooldown = 0;
+                    this.currentHits = 0;
+                } else {
+                    // Regular hadouken properties
+                    this.velocity = facing * 10;
+                    this.hitbox = { x: -25, y: -25, width: 50, height: 50 };
+                    this.rotation = 0;
+                }
             }
 
             update() {
-                this.x += this.velocity;
-                this.rotation += 0.3;
-                
-                // Remove if off screen
-                if (this.x < -50 || this.x > canvas.width + 50) {
-                    this.active = false;
-                }
-                
-                // Trail particles
-                if (Math.random() > 0.7) {
-                    particles.push(new Particle(
-                        this.x + (Math.random() - 0.5) * 20,
-                        this.y + (Math.random() - 0.5) * 20,
-                        'fire'
-                    ));
+                if (this.isFlamethrower) {
+                    // Flamethrower update logic
+                    if (this.duration > 0) {
+                        this.particleSpawnTimer++;
+                        if (this.particleSpawnTimer % 2 === 0) { // Spawn every 2 frames
+                            for (let i = 0; i < 4; i++) {
+                                this.particles.push(new FlameParticle(
+                                    this.x,
+                                    this.y + (Math.random() - 0.5) * 30,
+                                    this.facing
+                                ));
+                            }
+                        }
+                        this.duration--;
+                    }
+                    
+                    // Update particles
+                    this.particles = this.particles.filter(p => {
+                        p.update();
+                        return p.life > 0;
+                    });
+                    
+                    // Deactivate when no particles left
+                    if (this.particles.length === 0 && this.duration <= 0) {
+                        this.active = false;
+                    }
+                    
+                    // Update hitbox position and size based on flame spread
+                    if (this.duration > 0) {
+                        const spread = (35 - this.duration) * 2;
+                        this.hitbox.x = this.facing === 1 ? 0 : -(120 + spread);
+                        this.hitbox.width = 120 + spread;
+                    }
+                } else {
+                    // Regular hadouken update logic
+                    this.x += this.velocity;
+                    this.rotation += 0.3;
+                    
+                    // Remove if off screen
+                    if (this.x < -50 || this.x > canvas.width + 50) {
+                        this.active = false;
+                    }
+                    
+                    // Trail particles for hadouken
+                    if (Math.random() > 0.7) {
+                        particles.push(new Particle(
+                            this.x + (Math.random() - 0.5) * 20,
+                            this.y + (Math.random() - 0.5) * 20,
+                            'energy'
+                        ));
+                    }
                 }
             }
 
             draw() {
-                ctx.save();
-                ctx.translate(this.x, this.y);
-                ctx.rotate(this.rotation);
-                
-                // Outer glow
-                ctx.shadowBlur = 30;
-                ctx.shadowColor = '#00ccff';
-                
-                // Main fireball
-                const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, 25);
-                gradient.addColorStop(0, '#ffffff');
-                gradient.addColorStop(0.3, '#00ffff');
-                gradient.addColorStop(0.6, '#0099ff');
-                gradient.addColorStop(1, 'rgba(0, 102, 255, 0)');
-                
-                ctx.fillStyle = gradient;
-                ctx.beginPath();
-                ctx.arc(0, 0, 25, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // Inner core
-                ctx.fillStyle = '#ffffff';
-                ctx.beginPath();
-                ctx.arc(0, 0, 10, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // Energy wisps
-                ctx.strokeStyle = 'rgba(0, 200, 255, 0.5)';
-                ctx.lineWidth = 2;
-                for (let i = 0; i < 4; i++) {
-                    const angle = (i / 4) * Math.PI * 2 - this.rotation;
+                if (this.isFlamethrower) {
+                    // Draw all flame particles
+                    this.particles.forEach(p => p.draw());
+                } else {
+                    // Draw regular hadouken
+                    ctx.save();
+                    ctx.translate(this.x, this.y);
+                    ctx.rotate(this.rotation);
+                    
+                    // Outer glow
+                    ctx.shadowBlur = 30;
+                    ctx.shadowColor = '#00ccff';
+                    
+                    // Main fireball
+                    const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, 25);
+                    gradient.addColorStop(0, '#ffffff');
+                    gradient.addColorStop(0.3, '#00ffff');
+                    gradient.addColorStop(0.6, '#0099ff');
+                    gradient.addColorStop(1, 'rgba(0, 102, 255, 0)');
+                    
+                    ctx.fillStyle = gradient;
                     ctx.beginPath();
-                    ctx.moveTo(0, 0);
-                    ctx.lineTo(Math.cos(angle) * 35, Math.sin(angle) * 35);
-                    ctx.stroke();
+                    ctx.arc(0, 0, 25, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Inner core
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 10, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Energy wisps
+                    ctx.strokeStyle = 'rgba(0, 200, 255, 0.5)';
+                    ctx.lineWidth = 2;
+                    for (let i = 0; i < 4; i++) {
+                        const angle = (i / 4) * Math.PI * 2 - this.rotation;
+                        ctx.beginPath();
+                        ctx.moveTo(0, 0);
+                        ctx.lineTo(Math.cos(angle) * 35, Math.sin(angle) * 35);
+                        ctx.stroke();
+                    }
+                    
+                    ctx.restore();
                 }
-                
-                ctx.restore();
             }
         }
 
@@ -3587,8 +3705,8 @@
             
             // Special moves
             hadouken: { 
-                startup: 13, active: 40, recovery: 40, damage: 8, 
-                hitstun: 20, blockstun: 16, pushback: 3, projectile: true,
+                startup: 10, active: 35, recovery: 25, damage: 3, 
+                hitstun: 10, blockstun: 8, pushback: 1, projectile: true, hits: 5,
                 hitboxes: []  // Projectile handles its own collision
             },
             shoryuken: { 
@@ -4113,6 +4231,12 @@
                 
                 // Projectile collisions
                 attacker.projectiles.forEach(proj => {
+                    // Skip if projectile is not active or recently hit
+                    if (!proj.active || proj.hitCooldown > 0) {
+                        if (proj.hitCooldown > 0) proj.hitCooldown--;
+                        return;
+                    }
+                    
                     defender.hurtboxes.forEach(hurtbox => {
                         const projHit = {
                             x: proj.x + proj.hitbox.x,
@@ -4140,7 +4264,17 @@
                                 false,
                                 attacker
                             );
-                            proj.active = false;
+                            
+                            // For flamethrower, don't destroy projectile, just add hit cooldown
+                            if (proj.moveData.hits && proj.moveData.hits > 1) {
+                                proj.hitCooldown = 8; // Wait 8 frames before next hit
+                                proj.currentHits = (proj.currentHits || 0) + 1;
+                                if (proj.currentHits >= proj.moveData.hits) {
+                                    proj.active = false;
+                                }
+                            } else {
+                                proj.active = false;
+                            }
                         }
                     });
                 });
