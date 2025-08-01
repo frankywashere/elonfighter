@@ -176,13 +176,17 @@
             font-size: 18px;
         }
         
-        /* 6-button layout optimized for mobile */
-        .btn-lp { top: 30px; right: 210px; }
-        .btn-mp { top: 0; right: 120px; }
-        .btn-hp { top: 0; right: 30px; }
-        .btn-lk { bottom: 30px; right: 210px; }
-        .btn-mk { bottom: 0; right: 120px; }
-        .btn-hk { bottom: 0; right: 30px; }
+        /* 2-button layout optimized for mobile */
+        .btn-punch { 
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+        }
+        .btn-kick { 
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+        }
         
         @media (max-width: 768px) {
             .controls {
@@ -221,12 +225,8 @@
             
             <!-- Action Buttons -->
             <div class="action-buttons">
-                <div class="touch-button action-button btn-lp" data-key="u">LP</div>
-                <div class="touch-button action-button btn-mp" data-key="i">MP</div>
-                <div class="touch-button action-button btn-hp" data-key="o">HP</div>
-                <div class="touch-button action-button btn-lk" data-key="j">LK</div>
-                <div class="touch-button action-button btn-mk" data-key="k">MK</div>
-                <div class="touch-button action-button btn-hk" data-key="l">HK</div>
+                <div class="touch-button action-button btn-punch" data-key="u">PUNCH</div>
+                <div class="touch-button action-button btn-kick" data-key="j">KICK</div>
             </div>
         </div>
     </div>
@@ -240,6 +240,14 @@
         // Enable image smoothing for better graphics
         ctx.imageSmoothingEnabled = false;
 
+        // Background image
+        const backgroundImage = new Image();
+        backgroundImage.src = 'ChatGPT Image Jul 31, 2025, 08_46_53 PM.png';
+        let backgroundLoaded = false;
+        backgroundImage.onload = () => {
+            backgroundLoaded = true;
+        };
+
         // Global effects
         let screenShake = 0;
         let hitPause = 0;
@@ -248,16 +256,228 @@
         let comboTimer = 0;
         let particles = [];
         let afterImages = [];
+        
+        // Testing toggle
+        let aiAttackDisabled = false;  // Toggle for disabling AI attacks (press '1')
 
         // Constants
         const GROUND_Y = 440;
         const GRAVITY = 0.8;
         const WALK_SPEED_FORWARD = 3.5;
         const WALK_SPEED_BACKWARD = 2.8;
-        const JUMP_VELOCITY_Y = -16;
+        const JUMP_VELOCITY_Y = -22;  // Increased from -16 for higher jumps
         const JUMP_VELOCITY_X = 5.5;
-        const THROW_RANGE = 85;
+        const THROW_RANGE = 75;  // Increased from 60 to make throws more consistent
+        
+        // Debug sprite positioning - adjust these values if sprites float or sink
+        let SPRITE_DEBUG_MODE = false;  // Set to true to show sprite bounds
+        let HITBOX_DEBUG_MODE = false;   // Set to true to visualize hitboxes and hurtboxes
+        let SPRITE_Y_OFFSET = 54;  // Correct offset for sprite positioning
         const THROW_TECH_WINDOW = 7;
+
+        // Sprite Manager - handles loading and caching character sprites
+        class SpriteManager {
+            constructor() {
+                this.sprites = {};
+                this.loaded = false;
+                this.loadingPromises = [];
+                
+                // Sprite mappings for different characters
+                this.spriteMappings = {
+                    'elon': {
+                        basePath: 'elon/Elon1_normalized_v3/',
+                        sprites: {
+                            'idle': 'standing.png',
+                            'walk': 'walking1.png',  // First frame of walk cycle
+                            'walk2': 'walking2.png', // Second frame
+                            'walk3': 'walking3.png', // Third frame
+                            'crouch': 'crouch.png',  // Now we have a crouch sprite!
+                            'jump': 'jump-elon.png',
+                            'punch': 'punch.png',  // Standing punch
+                            'punch2': 'punch2.png', // Alternative punch
+                            'P': 'punch.png',  // Alias for move
+                            'P2': 'punch2.png', // Alias for move
+                            'K': 'kick-elon.png',   // Standing kick
+                            'kick-standing': 'kick-elon.png',  // Alias
+                            'crP': 'crouch-punch.png', // Crouch punch
+                            'crK': 'crouch-kick.png',  // Crouch kick
+                            'jP': 'jumppunch-elon.png',    // Jump punch
+                            'jK': 'jump-kick.png',     // Jump kick
+                            'block': 'block.png',
+                            'crouch-block': 'crouch-block.png',  // Crouch blocking sprite
+                            'hit': 'hit.png',  // New hit sprite!
+                            'knockdown': 'thrown.png',  // Using thrown as knockdown
+                            'beingThrown': 'thrown.png',
+                            'throwingOpponent': 'punch2.png',  // Using punch2 for throw
+                            'dizzy': 'hit.png',  // Use hit sprite for dizzy
+                            'hitstun': 'hit.png'  // Use hit sprite for hitstun
+                        }
+                    },
+                    'trump': {
+                        basePath: 'trump1_normalized_v3/',
+                        sprites: {
+                            'idle': 'standing.png',
+                            'walk': 'walking-forward.png',  // Use the new walking sprite
+                            'walk2': 'standing.png',  // Alternate frame for walk animation
+                            'crouch': 'crouch.png',
+                            'jump': 'jump.png',
+                            'punch': 'punch-standing.png',  // Standing punch
+                            'P': 'punch-standing.png',  // Alias for move
+                            'K': 'kick-standing.png',   // Standing kick
+                            'kick-standing': 'kick-standing.png',  // Alias
+                            'crP': 'crouch-punch.png', // Crouch punch
+                            'crK': 'crouch-kick.png',  // Crouch kick
+                            'jP': 'jump.png',    // Use jump sprite for jump punch
+                            'jK': 'jump-kick.png',     // Jump kick
+                            'block': 'crouch-block.png',
+                            'hit': 'hit.png',  // Now Trump has a hit sprite too!
+                            'knockdown': 'thrown.png',  // Use thrown sprite for knockdown
+                            'beingThrown': 'thrown.png',
+                            'dizzy': 'hit.png',  // Use hit for dizzy
+                            'hitstun': 'hit.png'  // Use hit for hitstun
+                        }
+                    }
+                };
+                
+                // Sprite scaling and positioning data
+                this.spriteConfig = {
+                    scale: 0.41,  // Default sprite scale
+                    anchorY: 0.95,  // Anchor point near feet (95% from top)
+                    get offsetY() { return SPRITE_Y_OFFSET; },  // Use global offset for easy debugging
+                    defaultWidth: 64,  // Expected sprite width
+                    defaultHeight: 64  // Expected sprite height
+                };
+                
+                // Debug mode for adjusting sprites
+                this.debug = false;
+            }
+            
+            async loadCharacterSprites(characterName) {
+                const mapping = this.spriteMappings[characterName];
+                if (!mapping) {
+                    console.warn(`No sprite mapping for character: ${characterName}`);
+                    return;
+                }
+                
+                const promises = [];
+                
+                for (const [state, filename] of Object.entries(mapping.sprites)) {
+                    const path = mapping.basePath + filename;
+                    const key = `${characterName}_${state}`;
+                    
+                    // Don't reload if already loading or loaded
+                    if (this.sprites[key]) continue;
+                    
+                    const promise = this.loadSprite(key, path);
+                    promises.push(promise);
+                }
+                
+                await Promise.all(promises);
+                console.log(`[SPRITES] Loaded sprites for ${characterName}`);
+            }
+            
+            async loadSprite(key, path) {
+                return new Promise((resolve, reject) => {
+                    const img = new Image();
+                    
+                    img.onload = () => {
+                        this.sprites[key] = img;
+                        console.log(`[SPRITES] Loaded: ${key} (${img.width}x${img.height})`);
+                        resolve(img);
+                    };
+                    
+                    img.onerror = () => {
+                        console.error(`[SPRITES] Failed to load: ${path}`);
+                        reject(new Error(`Failed to load sprite: ${path}`));
+                    };
+                    
+                    img.src = path;
+                });
+            }
+            
+            getSprite(characterName, state) {
+                const key = `${characterName}_${state}`;
+                return this.sprites[key];
+            }
+            
+            drawSprite(ctx, characterName, state, x, y, facing = 1, rotation = 0) {
+                const sprite = this.getSprite(characterName, state);
+                
+                if (!sprite) {
+                    // console.log(`[SPRITE] Missing sprite: ${characterName}_${state}`);
+                    return false;
+                }
+                
+                ctx.save();
+                
+                // Get actual sprite dimensions
+                const spriteWidth = sprite.width;
+                const spriteHeight = sprite.height;
+                
+                // Apply scale to find scaled dimensions
+                const scaledHeight = spriteHeight * this.spriteConfig.scale;
+                const scaledWidth = spriteWidth * this.spriteConfig.scale;
+                
+                // Position at character location (feet position)
+                // We need to draw the sprite ABOVE the ground position
+                ctx.translate(x, y);
+                
+                // Apply rotation if any (for throws)
+                if (rotation !== 0) {
+                    ctx.rotate(rotation);
+                }
+                
+                // Apply scale
+                ctx.scale(this.spriteConfig.scale, this.spriteConfig.scale);
+                
+                // Flip horizontally if facing left
+                if (facing === -1) {
+                    ctx.scale(-1, 1);
+                    if (SPRITE_DEBUG_MODE) {
+                        console.log(`[SPRITE] Flipping sprite for ${characterName}, state: ${state}, facing: ${facing}`);
+                    }
+                }
+                
+                // Draw sprite - sprites are already normalized, so just center them
+                const drawX = -spriteWidth / 2;
+                const drawY = -spriteHeight + this.spriteConfig.offsetY / this.spriteConfig.scale;
+                
+                ctx.drawImage(sprite, drawX, drawY);
+                
+                // Debug mode - show sprite bounds and ground line
+                if (SPRITE_DEBUG_MODE) {
+                    ctx.strokeStyle = 'red';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(drawX, drawY, spriteWidth, spriteHeight);
+                    
+                    // Show character position (feet)
+                    ctx.fillStyle = 'lime';
+                    ctx.fillRect(-2, -2, 4, 4);
+                    
+                    // Show actual sprite dimensions
+                    ctx.fillStyle = 'yellow';
+                    ctx.font = '12px monospace';
+                    ctx.fillText(`${spriteWidth}x${spriteHeight}`, drawX, drawY - 5);
+                    
+                    // Reset transform to draw ground line
+                    ctx.restore();
+                    ctx.save();
+                    ctx.strokeStyle = 'cyan';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(x - 50, y);
+                    ctx.lineTo(x + 50, y);
+                    ctx.stroke();
+                }
+                
+                ctx.restore();
+                
+                return true;
+            }
+        }
+        
+        // Create global sprite manager
+        const spriteManager = new SpriteManager();
 
         // Input Manager - handles keyboard, touch, and gamepad inputs
         class InputManager {
@@ -295,6 +515,44 @@
                     // Restart game on ESC
                     if (key === 'escape' && window.gameOver) {
                         location.reload();
+                    }
+                    
+                    // Toggle AI attacks with '1' key
+                    if (key === '1') {
+                        aiAttackDisabled = !aiAttackDisabled;
+                        console.log('[DEBUG] AI attacks:', aiAttackDisabled ? 'DISABLED' : 'ENABLED');
+                    }
+                    
+                    // Toggle hitbox visualization with 'h' key
+                    if (key === 'h' || key === 'H') {
+                        HITBOX_DEBUG_MODE = !HITBOX_DEBUG_MODE;
+                        console.log('[DEBUG] Hitbox visualization:', HITBOX_DEBUG_MODE ? 'ON' : 'OFF');
+                    }
+                    
+                    // Sprite scale adjustment with +/- keys
+                    if (key === '=' || key === '+') {
+                        spriteManager.spriteConfig.scale += 0.05;
+                        console.log('[SPRITES] Scale increased to:', spriteManager.spriteConfig.scale);
+                    }
+                    if (key === '-' || key === '_') {
+                        spriteManager.spriteConfig.scale = Math.max(0.05, spriteManager.spriteConfig.scale - 0.05);
+                        console.log('[SPRITES] Scale decreased to:', spriteManager.spriteConfig.scale);
+                    }
+                    
+                    // Sprite Y offset adjustment with 9/0 keys
+                    if (key === '9') {
+                        SPRITE_Y_OFFSET -= 2;
+                        console.log('[SPRITES] Y Offset:', SPRITE_Y_OFFSET);
+                    }
+                    if (key === '0') {
+                        SPRITE_Y_OFFSET += 2;
+                        console.log('[SPRITES] Y Offset:', SPRITE_Y_OFFSET);
+                    }
+                    
+                    // Toggle sprite debug mode with 8 key
+                    if (key === '8') {
+                        SPRITE_DEBUG_MODE = !SPRITE_DEBUG_MODE;
+                        console.log('[SPRITES] Debug mode:', SPRITE_DEBUG_MODE ? 'ON' : 'OFF');
                     }
                     
                     e.preventDefault();
@@ -491,19 +749,19 @@
                         this.keys['s'] = false;
                     }
                     
-                    // Button mapping (Xbox/PS5 compatible)
-                    // X/Square = LP, Y/Triangle = MP, RB/R1 = HP
-                    // A/X = LK, B/Circle = MK, RT/R2 = HK
+                    // Button mapping (Xbox/PS5 compatible) - 4 BUTTON SYSTEM
+                    // X/Square = LP, Y/Triangle = HP
+                    // A/X = LK, B/Circle = HK
                     
                     const buttonMap = {
                         0: 'j',  // A/X button -> LK
-                        1: 'k',  // B/Circle -> MK
+                        1: 'k',  // B/Circle -> HK
                         2: 'u',  // X/Square -> LP
-                        3: 'i',  // Y/Triangle -> MP
-                        4: 'o',  // LB/L1 -> HP (alternative)
-                        5: 'o',  // RB/R1 -> HP
-                        6: 'l',  // LT/L2 -> HK (alternative)
-                        7: 'l'   // RT/R2 -> HK
+                        3: 'i',  // Y/Triangle -> HP
+                        4: 'u',  // LB/L1 -> LP (alternative)
+                        5: 'i',  // RB/R1 -> HP (alternative)
+                        6: 'j',  // LT/L2 -> LK (alternative)
+                        7: 'k'   // RT/R2 -> HK (alternative)
                     };
                     
                     // Update button states
@@ -526,49 +784,109 @@
                     // Track directional changes and add to input buffer for special moves
                     if (this.player && this.player.inputBuffer) {
                         const facing = this.player.facing || 1;
+                        let addedDirection = null;
                         
                         // Check for directional changes
                         if (currentState.down && !this.lastDirections.down) {
                             this.player.inputBuffer.addDirection('2');
+                            addedDirection = '2';
                         }
                         if (currentState.up && !this.lastDirections.up) {
                             this.player.inputBuffer.addDirection('8');
+                            addedDirection = '8';
                         }
                         
                         // Handle left/right based on facing
                         if (facing === 1) {
                             if (currentState.left && !this.lastDirections.left) {
                                 this.player.inputBuffer.addDirection('4');
+                                addedDirection = '4';
                             }
                             if (currentState.right && !this.lastDirections.right) {
                                 this.player.inputBuffer.addDirection('6');
+                                addedDirection = '6';
                             }
                         } else {
                             // Reversed when facing left
                             if (currentState.left && !this.lastDirections.left) {
                                 this.player.inputBuffer.addDirection('6');
+                                addedDirection = '6';
                             }
                             if (currentState.right && !this.lastDirections.right) {
                                 this.player.inputBuffer.addDirection('4');
+                                addedDirection = '4';
                             }
                         }
                         
-                        // Handle diagonals
+                        // Handle diagonals - always add current diagonal state
                         if (currentState.down && currentState.right) {
-                            if (!this.lastDirections.down || !this.lastDirections.right) {
-                                this.player.inputBuffer.addDirection(facing === 1 ? '3' : '1');
+                            const dir = facing === 1 ? '3' : '1';
+                            // Add direction if it changed or every few frames while holding
+                            if (!this.lastDirections.down || !this.lastDirections.right || 
+                                (this.player.inputBuffer.directions.length === 0 || 
+                                 this.player.inputBuffer.directions[this.player.inputBuffer.directions.length - 1].dir !== dir)) {
+                                this.player.inputBuffer.addDirection(dir);
+                                addedDirection = dir;
                             }
                         } else if (currentState.down && currentState.left) {
-                            if (!this.lastDirections.down || !this.lastDirections.left) {
-                                this.player.inputBuffer.addDirection(facing === 1 ? '1' : '3');
+                            const dir = facing === 1 ? '1' : '3';
+                            if (!this.lastDirections.down || !this.lastDirections.left ||
+                                (this.player.inputBuffer.directions.length === 0 || 
+                                 this.player.inputBuffer.directions[this.player.inputBuffer.directions.length - 1].dir !== dir)) {
+                                this.player.inputBuffer.addDirection(dir);
+                                addedDirection = dir;
                             }
                         } else if (currentState.up && currentState.right) {
-                            if (!this.lastDirections.up || !this.lastDirections.right) {
-                                this.player.inputBuffer.addDirection(facing === 1 ? '9' : '7');
+                            const dir = facing === 1 ? '9' : '7';
+                            if (!this.lastDirections.up || !this.lastDirections.right ||
+                                (this.player.inputBuffer.directions.length === 0 || 
+                                 this.player.inputBuffer.directions[this.player.inputBuffer.directions.length - 1].dir !== dir)) {
+                                this.player.inputBuffer.addDirection(dir);
+                                addedDirection = dir;
                             }
                         } else if (currentState.up && currentState.left) {
-                            if (!this.lastDirections.up || !this.lastDirections.left) {
-                                this.player.inputBuffer.addDirection(facing === 1 ? '7' : '9');
+                            const dir = facing === 1 ? '7' : '9';
+                            if (!this.lastDirections.up || !this.lastDirections.left ||
+                                (this.player.inputBuffer.directions.length === 0 || 
+                                 this.player.inputBuffer.directions[this.player.inputBuffer.directions.length - 1].dir !== dir)) {
+                                this.player.inputBuffer.addDirection(dir);
+                                addedDirection = dir;
+                            }
+                        }
+                        
+                        // Debug logging for gamepad inputs
+                        if (addedDirection && this.player.isPlayer) {
+                            const recentDirs = this.player.inputBuffer.directions
+                                .slice(-6)
+                                .map(d => d.dir)
+                                .join('');
+                            console.log('[GAMEPAD] Input:', addedDirection, '| Buffer:', recentDirs, '| Facing:', facing === 1 ? 'RIGHT' : 'LEFT');
+                            
+                            // Check for special moves and provide helpful feedback
+                            if (recentDirs.includes('236')) {
+                                console.log('[GAMEPAD] ✓ Hadouken motion detected! Now press any PUNCH button (X/Square, Y/Triangle, or RB/R1)');
+                            }
+                            if (recentDirs.includes('623')) {
+                                console.log('[GAMEPAD] ✓ Shoryuken motion detected! Now press any PUNCH button (X/Square, Y/Triangle, or RB/R1)');
+                            }
+                            if (recentDirs.includes('214')) {
+                                console.log('[GAMEPAD] ✓ Tatsumaki motion detected! Now press any KICK button (A/X, B/Circle, or RT/R2)');
+                            }
+                            
+                            // Help user understand the motions
+                            if (recentDirs.includes('241')) {
+                                console.log('[GAMEPAD] Tip: You did quarter-circle BACK. For Hadouken, do quarter-circle FORWARD (down, down-forward, forward)');
+                            }
+                            if (recentDirs.includes('263')) {
+                                console.log('[GAMEPAD] Tip: You did quarter-circle FORWARD. For Tatsumaki, do quarter-circle BACK (down, down-back, back)');
+                            }
+                            
+                            // Check if they're close to a special move
+                            if (recentDirs.includes('21') || recentDirs.includes('23')) {
+                                console.log('[GAMEPAD] Tip: Almost Hadouken! Complete with forward (→) + punch');
+                            }
+                            if (recentDirs.includes('62')) {
+                                console.log('[GAMEPAD] Tip: Almost Shoryuken! Complete with down-forward (↘) + punch');
                             }
                         }
                         
@@ -722,11 +1040,17 @@
 
         // Enhanced Fighter class
         class Fighter {
-            constructor(x, isPlayer) {
+            constructor(x, isPlayer, characterName = 'elon') {
                 this.x = x;
                 this.y = GROUND_Y;
                 this.isPlayer = isPlayer;
                 this.facing = isPlayer ? 1 : -1;
+                
+                // Character identity for sprites
+                this.characterName = characterName;
+                
+                // Punch variety counter
+                this.punchCount = 0;
                 
                 // Physics
                 this.velocityX = 0;
@@ -755,6 +1079,15 @@
                 this.spriteFrame = 0;
                 this.breathingOffset = 0;
                 
+                // Throw cooldown
+                this.throwCooldown = 0;
+                this.throwButtonsPressed = false;  // Track if throw buttons are held
+                
+                // Throw animation state
+                this.beingThrown = false;
+                this.throwAttacker = null;
+                this.throwAnimationFrame = 0;
+                
                 // Move state
                 this.currentMove = null;
                 this.moveFrame = 0;
@@ -762,6 +1095,7 @@
                 this.blockstunFrames = 0;
                 this.knockdownFrames = 0;
                 this.invincibleFrames = 0;
+                this.rotation = 0;  // For throw spinning
                 
                 // Color scheme
                 this.skinColor = isPlayer ? '#f4c2a1' : '#f4c2a1';
@@ -785,6 +1119,16 @@
                 // Multi-hit tracking
                 this.currentMoveHits = 0;
                 this.lastHitFrame = -999;
+                
+                // Depth switch tracking
+                this.depthSwitchTimer = 0;
+                this.depthSwitchProgress = 0; // 0 to 1 for smooth transitions
+                
+                // Sprite transition tracking
+                this.previousSprite = 'idle';
+                this.spriteTransitionTimer = 0;
+                this.spriteTransitionFrom = null;
+                this.spriteTransitionTo = null;
             }
 
             drawCharacterSprite(isAfterImage = false) {
@@ -795,12 +1139,43 @@
                     this.breathingOffset = Math.sin(this.animTimer * 0.05) * 2;
                 }
                 
-                // Flip for facing
-                if (this.facing === -1) {
-                    ctx.translate(this.x, 0);
-                    ctx.scale(-1, 1);
-                    ctx.translate(-this.x, 0);
+                // Apply depth switch smoothing effects
+                if (!isAfterImage && this.depthSwitchTimer > 0) {
+                    // Calculate progress (0 to 1 and back to 0)
+                    const totalFrames = 10; // Total animation frames
+                    const halfFrames = totalFrames / 2;
+                    if (this.depthSwitchTimer > halfFrames) {
+                        // Fading in
+                        this.depthSwitchProgress = 1 - ((this.depthSwitchTimer - halfFrames) / halfFrames);
+                    } else {
+                        // Fading out
+                        this.depthSwitchProgress = this.depthSwitchTimer / halfFrames;
+                    }
+                    
+                    // 1. Subtle opacity change
+                    const baseOpacity = 0.9;
+                    const maxOpacity = 1.0;
+                    ctx.globalAlpha = baseOpacity + (this.depthSwitchProgress * (maxOpacity - baseOpacity));
+                    
+                    // 2. Position interpolation (move slightly forward)
+                    const moveAmount = this.depthSwitchProgress * 5;
+                    ctx.translate(this.facing * moveAmount, 0);
+                    
+                    // 3. Removed motion blur effect
                 }
+                
+                // Apply rotation for throw animation only when being thrown
+                if (this.rotation !== 0 && this.state === 'beingThrown') {
+                    ctx.translate(this.x, this.y - 50);
+                    ctx.rotate(this.rotation);
+                    ctx.translate(-this.x, -(this.y - 50));
+                } else if (this.rotation !== 0) {
+                    // Clean up any stuck rotation
+                    this.rotation = 0;
+                }
+                
+                // Note: Flipping is handled inside spriteManager.drawSprite
+                // so we don't need to do it here for sprites
                 
                 // Shadow
                 if (!isAfterImage) {
@@ -819,11 +1194,252 @@
                     ctx.shadowColor = '#ffff00';
                 }
                 
+                
                 // Draw based on state
                 const baseY = this.y + this.breathingOffset;
                 
+                // Try to use sprites first if available
+                if (this.characterName) {
+                    let spriteState = null;
+                    let useSprite = true;
+                    
+                    // Map game states to sprite states
+                    if (this.state === 'knockdown' || this.knockdownFrames > 0) {
+                        spriteState = 'knockdown';
+                    } else if (this.state === 'beingThrown') {
+                        spriteState = 'beingThrown';
+                    } else if (this.state === 'throwingOpponent') {
+                        spriteState = 'throwingOpponent';  // Use throwing opponent sprite
+                    } else if (!this.grounded && this.state === 'attack') {
+                        // Jumping attacks
+                        if (this.currentMove === 'jP') {
+                            spriteState = 'jP';
+                        } else if (this.currentMove === 'jK') {
+                            spriteState = 'jK';
+                        } else {
+                            spriteState = 'jump';
+                        }
+                    } else if (!this.grounded) {
+                        spriteState = 'jump';
+                    } else if (this.state === 'attack' && this.currentMove) {
+                        // Handle special moves - only if we're actually in attack state AND have a move
+                        if (this.currentMove === 'hadouken') {
+                            spriteState = 'P';  // Use punch sprite for hadouken
+                        } else if (this.currentMove === 'shoryuken') {
+                            spriteState = 'jP';  // Use jump punch for shoryuken
+                        } else if (this.currentMove === 'tatsumaki') {
+                            spriteState = 'jK';  // Use jump kick for tatsumaki
+                        } else if (this.currentMove) {
+                            // Handle punch cycling for variety
+                            if (this.currentMove === 'P' && this.characterName === 'elon') {
+                                // Alternate between punch sprites
+                                spriteState = (this.punchCount % 2 === 0) ? 'punch' : 'punch2';
+                            } else {
+                                // Direct mapping - move names should match sprite keys
+                                spriteState = this.currentMove;
+                            }
+                        } else {
+                            spriteState = 'idle';
+                        }
+                    } else if (this.state === 'walk') {
+                        // Animated walk cycle
+                        if (this.characterName === 'elon') {
+                            // 3-frame walk cycle for Elon
+                            const walkCycleFrame = Math.floor(this.animTimer / 6) % 3;
+                            
+                            // Cycle through walk -> walk2 -> walk3
+                            if (walkCycleFrame === 0) {
+                                spriteState = 'walk';  // walking1.png
+                            } else if (walkCycleFrame === 1) {
+                                spriteState = 'walk2'; // walking2.png
+                            } else {
+                                spriteState = 'walk3'; // walking3.png
+                            }
+                            
+                            // Add a slight vertical bob for more natural movement
+                            if (!isAfterImage) {
+                                const bobAmount = Math.sin(this.animTimer * 0.2) * 1.5;
+                                this.breathingOffset = bobAmount;
+                            }
+                        } else if (this.characterName === 'trump') {
+                            // Create a smooth walk cycle
+                            // Use a slower cycle for more natural walking
+                            const walkCycleFrame = Math.floor(this.animTimer / 8) % 4;
+                            
+                            // Create a pattern: walk -> walk -> walk2 -> walk2
+                            // This gives a nice rhythm with the step emphasized
+                            if (walkCycleFrame < 2) {
+                                spriteState = 'walk';  // Walking forward sprite
+                            } else {
+                                spriteState = 'walk2';  // Standing sprite
+                            }
+                            
+                            // Add a slight vertical bob for more natural movement
+                            if (!isAfterImage) {
+                                const bobAmount = Math.sin(this.animTimer * 0.15) * 2;
+                                this.breathingOffset = bobAmount;
+                            }
+                        } else {
+                            spriteState = 'walk';
+                        }
+                    } else if (this.blocking && this.crouching) {
+                        // Crouch blocking - check if sprite exists
+                        if (this.characterName === 'elon') {
+                            spriteState = 'crouch-block';  // Use special crouch-block sprite
+                        } else {
+                            spriteState = 'crouch';  // Fallback to crouch
+                        }
+                    } else if (this.state === 'crouch' || this.crouching) {
+                        spriteState = 'crouch';
+                    } else if (this.blocking) {
+                        spriteState = 'block';
+                    } else if (this.state === 'hitstun') {
+                        spriteState = 'hitstun';
+                    } else if (this.state === 'blockstun') {
+                        spriteState = 'block';  // Use block sprite for blockstun
+                    } else if (this.state === 'dizzy') {
+                        spriteState = 'dizzy';
+                    } else {
+                        spriteState = 'idle';
+                    }
+                    
+                    // Detect sprite transitions for interpolation
+                    if (spriteState !== this.previousSprite && !isAfterImage) {
+                        // Check if this is an attack transition we should interpolate
+                        const isAttackTransition = 
+                            (this.previousSprite === 'idle' && (spriteState === 'P' || spriteState === 'punch' || spriteState === 'punch2' || spriteState === 'K' || spriteState === 'cK' || spriteState === 'jK')) ||
+                            ((this.previousSprite === 'P' || this.previousSprite === 'punch' || this.previousSprite === 'punch2' || this.previousSprite === 'K' || this.previousSprite === 'cK' || this.previousSprite === 'jK') && spriteState === 'idle');
+                        
+                        if (isAttackTransition) {
+                            this.spriteTransitionFrom = this.previousSprite;
+                            this.spriteTransitionTo = spriteState;
+                            this.spriteTransitionTimer = 8; // 8 frames for smoother interpolation
+                        }
+                        this.previousSprite = spriteState;
+                    }
+                    
+                    // Handle frame interpolation for transitions
+                    if (this.spriteTransitionTimer > 0 && !isAfterImage && this.spriteTransitionFrom && this.spriteTransitionTo) {
+                        const totalFrames = 8;
+                        const progress = 1 - (this.spriteTransitionTimer / totalFrames);
+                        
+                        // Draw interpolated frames
+                        ctx.save();
+                        
+                        // Draw the "from" sprite with decreasing opacity
+                        ctx.globalAlpha = 1 - progress;
+                        spriteManager.drawSprite(
+                            ctx, 
+                            this.characterName, 
+                            this.spriteTransitionFrom, 
+                            this.x, 
+                            this.y,
+                            this.facing,
+                            0
+                        );
+                        
+                        // Draw the "to" sprite with increasing opacity
+                        ctx.globalAlpha = progress;
+                        
+                        // Add position offset for punches/kicks to simulate extension
+                        let offsetX = 0;
+                        if (this.spriteTransitionTo === 'P' || this.spriteTransitionTo === 'punch' || this.spriteTransitionTo === 'punch2') {
+                            offsetX = Math.sin(progress * Math.PI * 0.5) * 3 * this.facing;
+                        } else if (this.spriteTransitionTo === 'K' || this.spriteTransitionTo === 'cK' || this.spriteTransitionTo === 'jK') {
+                            offsetX = Math.sin(progress * Math.PI * 0.5) * 5 * this.facing;
+                        }
+                        
+                        spriteManager.drawSprite(
+                            ctx, 
+                            this.characterName, 
+                            this.spriteTransitionTo, 
+                            this.x + offsetX, 
+                            this.y,
+                            this.facing,
+                            0
+                        );
+                        
+                        ctx.restore();
+                        
+                        this.spriteTransitionTimer--;
+                        
+                        // Skip normal sprite drawing during transition
+                        if (this.spriteTransitionTimer > 0) {
+                            // Reset filters
+                            ctx.filter = 'none';
+                            ctx.globalAlpha = 1.0;
+                            
+                            // Dizzy stars still need to be drawn
+                            if (this.isDizzy) {
+                                ctx.fillStyle = '#ffff00';
+                                ctx.font = 'bold 24px Arial';
+                                ctx.shadowBlur = 10;
+                                ctx.shadowColor = '#ffff00';
+                                for (let i = 0; i < 3; i++) {
+                                    const angle = (this.animTimer * 0.1) + (i * Math.PI * 2 / 3);
+                                    const starX = this.x + Math.cos(angle) * 30;
+                                    const starY = baseY - 120 + Math.sin(angle) * 10;
+                                    ctx.fillText('★', starX - 12, starY);
+                                }
+                            }
+                            
+                            // Reset filters before returning
+                            ctx.filter = 'none';
+                            ctx.globalAlpha = 1.0;
+                            
+                            ctx.restore();
+                            return;
+                        }
+                    }
+                    
+                    // Continue with normal sprite drawing if not transitioning
+                    if (useSprite && spriteState) {
+                        // console.log(`[SPRITE ATTEMPT] Character: ${this.characterName}, State: ${this.state}, SpriteState: ${spriteState}, CurrentMove: ${this.currentMove}`);
+                        const spriteDrawn = spriteManager.drawSprite(
+                            ctx, 
+                            this.characterName, 
+                            spriteState, 
+                            this.x, 
+                            this.y,
+                            this.facing,
+                            this.state === 'beingThrown' ? this.rotation : 0
+                        );
+                        
+                        // If sprite was drawn successfully, handle additional effects then return
+                        if (spriteDrawn) {
+                            // Dizzy stars still need to be drawn
+                            if (this.isDizzy) {
+                                ctx.fillStyle = '#ffff00';
+                                ctx.font = 'bold 24px Arial';
+                                ctx.shadowBlur = 10;
+                                ctx.shadowColor = '#ffff00';
+                                for (let i = 0; i < 3; i++) {
+                                    const angle = (this.animTimer * 0.1) + (i * Math.PI * 2 / 3);
+                                    const starX = this.x + Math.cos(angle) * 30;
+                                    const starY = baseY - 120 + Math.sin(angle) * 10;
+                                    ctx.fillText('★', starX - 12, starY);
+                                }
+                            }
+                            
+                            // Reset filters before returning
+                            ctx.filter = 'none';
+                            ctx.globalAlpha = 1.0;
+                            
+                            ctx.restore();
+                            return;
+                        }
+                    }
+                }
+                
+                // Fall back to shape-based drawing
+                // console.log(`[SPRITE FALLBACK] Character: ${this.characterName}, State: ${this.state}, Move: ${this.currentMove}, Grounded: ${this.grounded}, Crouching: ${this.crouching}`);
+                
                 if (this.state === 'knockdown' || this.knockdownFrames > 0) {
                     this.drawKnockdownSprite(baseY);
+                } else if (this.state === 'beingThrown') {
+                    this.drawBeingThrownSprite(baseY);
+                } else if (this.state === 'throwingOpponent') {
+                    this.drawThrowingSprite(baseY);
                 } else if (this.currentMove === 'shoryuken') {
                     this.drawShoryukenSprite(baseY);
                 } else if (this.currentMove === 'hadouken') {
@@ -855,6 +1471,10 @@
                         ctx.fillText('★', starX - 12, starY);
                     }
                 }
+                
+                // Reset any filters before restoring
+                ctx.filter = 'none';
+                ctx.globalAlpha = 1.0;
                 
                 ctx.restore();
             }
@@ -1038,10 +1658,9 @@
                 ctx.fill();
                 
                 // Attack specific poses
-                if (this.currentMove && this.currentMove.includes('P')) {
+                if (this.currentMove && (this.currentMove === 'P' || this.currentMove === 'crP')) {
                     // Punch extension
-                    const extension = this.currentMove.includes('H') ? 60 : 
-                                   this.currentMove.includes('M') ? 45 : 30;
+                    const extension = 45;
                     ctx.fillStyle = this.skinColor;
                     ctx.save();
                     ctx.translate(this.x + 20, baseY - 65);
@@ -1062,10 +1681,9 @@
                         ctx.lineTo(this.x + 20 + extension + 20, baseY - 65 + i * 5);
                         ctx.stroke();
                     }
-                } else if (this.currentMove && this.currentMove.includes('K')) {
+                } else if (this.currentMove && (this.currentMove === 'K' || this.currentMove === 'crK')) {
                     // Kick extension
-                    const extension = this.currentMove.includes('H') ? 80 : 
-                                   this.currentMove.includes('M') ? 60 : 40;
+                    const extension = 60;
                     ctx.fillStyle = this.pantsColor;
                     ctx.save();
                     ctx.translate(this.x, baseY - 40);
@@ -1103,7 +1721,7 @@
                 ctx.fillRect(-25, -20, 50, 40);
                 
                 // Jumping attack pose
-                if (this.currentMove && this.currentMove.includes('K')) {
+                if (this.currentMove && this.currentMove === 'jK') {
                     // Extended kick
                     ctx.fillStyle = this.pantsColor;
                     ctx.save();
@@ -1112,13 +1730,12 @@
                     ctx.fillStyle = this.skinColor;
                     ctx.fillRect(70, 2, 20, 16);
                     ctx.restore();
-                } else if (this.currentMove && this.currentMove.includes('P')) {
+                } else if (this.currentMove && this.currentMove === 'jP') {
                     // Jumping punch
                     ctx.fillStyle = this.skinColor;
                     ctx.save();
                     ctx.rotate(-0.3);
-                    const reach = this.currentMove.includes('H') ? 60 : 
-                                this.currentMove.includes('M') ? 45 : 30;
+                    const reach = 45;
                     ctx.fillRect(20, -10, reach, 15);
                     ctx.beginPath();
                     ctx.arc(20 + reach, -3, 10, 0, Math.PI * 2);
@@ -1390,6 +2007,10 @@
             drawKnockdownSprite(baseY) {
                 // Horizontal knocked down position
                 ctx.save();
+                
+                // Ensure no rotation during knockdown
+                this.rotation = 0;
+                
                 ctx.translate(this.x, GROUND_Y);
                 
                 // Flatten on ground
@@ -1406,6 +2027,108 @@
                 ctx.fill();
                 
                 ctx.restore();
+            }
+            
+            drawBeingThrownSprite(baseY) {
+                // Victim being spun around - simplified sprite
+                // Head
+                ctx.fillStyle = this.skinColor;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y - 80, 15, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Body (stretched/distorted)
+                ctx.fillStyle = this.giColor;
+                ctx.save();
+                ctx.translate(this.x, this.y - 50);
+                ctx.scale(0.8, 1.2);
+                ctx.fillRect(-20, -20, 40, 40);
+                ctx.restore();
+                
+                // Limbs flailing
+                ctx.fillStyle = this.skinColor;
+                const flail = Math.sin(this.throwAnimationFrame * 0.5) * 20;
+                // Arms
+                ctx.fillRect(this.x - 35 + flail, this.y - 60, 15, 30);
+                ctx.fillRect(this.x + 20 - flail, this.y - 60, 15, 30);
+                // Legs
+                ctx.fillStyle = this.pantsColor;
+                ctx.fillRect(this.x - 20 + flail * 0.5, this.y - 30, 15, 30);
+                ctx.fillRect(this.x + 5 - flail * 0.5, this.y - 30, 15, 30);
+                
+                // Motion blur effect
+                ctx.globalAlpha = 0.3;
+                ctx.save();
+                ctx.translate(this.x, this.y - 50);
+                ctx.rotate(-this.rotation * 0.5);
+                ctx.fillStyle = this.giColor;
+                ctx.fillRect(-25, -25, 50, 50);
+                ctx.restore();
+                ctx.globalAlpha = 1;
+            }
+            
+            drawThrowingSprite(baseY) {
+                const progress = this.throwAnimationFrame / 30;
+                
+                // Head
+                ctx.fillStyle = this.skinColor;
+                ctx.beginPath();
+                ctx.arc(this.x - 5, baseY - 85, 15, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Body (leaning into throw)
+                ctx.fillStyle = this.giColor;
+                ctx.save();
+                ctx.translate(this.x, baseY - 50);
+                ctx.rotate(0.3 * (1 - progress)); // Lean forward then straighten
+                ctx.fillRect(-25, -20, 50, 40);
+                ctx.restore();
+                
+                // Throwing arm (gripping opponent)
+                ctx.fillStyle = this.skinColor;
+                const armAngle = -0.5 + progress * 1.5; // Swing over head
+                ctx.save();
+                ctx.translate(this.x + 10, baseY - 60);
+                ctx.rotate(armAngle);
+                ctx.fillRect(0, 0, 50, 20);
+                // Hand gripping
+                ctx.beginPath();
+                ctx.arc(50, 10, 10, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+                
+                // Other arm for balance
+                ctx.save();
+                ctx.translate(this.x - 10, baseY - 60);
+                ctx.rotate(0.7);
+                ctx.fillRect(-15, 0, 15, 40);
+                ctx.restore();
+                
+                // Legs in power stance
+                ctx.fillStyle = this.pantsColor;
+                // Back leg
+                ctx.fillRect(this.x - 25, baseY - 30, 20, 30);
+                // Front leg
+                ctx.save();
+                ctx.translate(this.x + 5, baseY - 30);
+                ctx.rotate(-0.2);
+                ctx.fillRect(0, 0, 20, 35);
+                ctx.restore();
+                
+                // Power lines for effect
+                if (this.throwAnimationFrame < 15) {
+                    ctx.strokeStyle = '#ffff00';
+                    ctx.lineWidth = 2;
+                    ctx.globalAlpha = 0.5;
+                    for (let i = 0; i < 3; i++) {
+                        const angle = i * 0.5 - 0.5;
+                        ctx.beginPath();
+                        ctx.moveTo(this.x, baseY - 50);
+                        ctx.lineTo(this.x + Math.cos(angle) * 40, baseY - 50 + Math.sin(angle) * 20);
+                        ctx.stroke();
+                    }
+                    ctx.globalAlpha = 1;
+                }
             }
 
             updateDrawing() {
@@ -1437,6 +2160,13 @@
             }
 
             handleInput(keys) {
+                // Don't process input during certain states
+                if (this.state === 'hitstun' || this.state === 'knockdown' || 
+                    this.knockdownFrames > 0 || this.state === 'throwingOpponent' || 
+                    this.state === 'beingThrown') {
+                    return;
+                }
+                
                 // Update directional inputs for special moves
                 // Skip if gamepad is active (gamepad handles its own directional inputs)
                 const gamepadActive = navigator.getGamepads && 
@@ -1478,13 +2208,14 @@
                 
                 // Update facing FIRST (for cross-ups)
                 const opponent = this.isPlayer ? aiPlayer : player;
-                if (opponent && this.state !== 'attack' && !this.knockdownFrames) {
+                if (opponent && !this.knockdownFrames && this.state !== 'beingThrown' && this.state !== 'throwingOpponent') {
                     const oldFacing = this.facing;
                     this.facing = this.x < opponent.x ? 1 : -1;
                     
                     // If facing changed (cross-up), immediately update blocking
                     if (oldFacing !== this.facing) {
                         this.blocking = false; // Reset blocking on cross-up
+                        console.log(`[${this.isPlayer ? 'PLAYER' : 'AI'}] Facing changed from ${oldFacing} to ${this.facing}`);
                     }
                 }
                 
@@ -1512,9 +2243,11 @@
                 const hasActiveThreat = (opponentHasActiveHitbox && distance < 200) || hasIncomingProjectile;
                 
                 // You're in blocking stance if:
-                // 1. Holding back AND (close to opponent OR active threat exists)
-                // This allows walking backwards when far away with no threats
-                this.blocking = holdingBack && !this.isDizzy && (inBlockRange || hasActiveThreat);
+                // 1. Holding back AND there's an active threat
+                // 2. If no threat, only block if VERY close (< 80 units) to allow for walk-back at medium range
+                // This prevents getting stuck in block when trying to create space
+                const veryClose = distance < 80;
+                this.blocking = holdingBack && !this.isDizzy && (hasActiveThreat || (veryClose && opponent.state === 'attack'));
                 
                 // Debug logging for player - log every frame to catch the stuck state
                 if (this.isPlayer) {
@@ -1567,28 +2300,85 @@
                     return;
                 }
                 
-                // Check for throw
-                if (keys['i'] && keys['k'] && this.state !== 'attack' && this.grounded) {
-                    this.attemptThrow();
-                    return;
+                // Check for throw (punch + kick)
+                const punchPressed = keys['u'];  // Punch
+                const kickPressed = keys['j'];   // Kick
+                
+                // Also check if punch or kick was pressed very recently (within 3 frames)
+                const recentPunch = this.inputBuffer.buttons.some(b => 
+                    b.btn === 'P' && b.time < 3
+                );
+                const recentKick = this.inputBuffer.buttons.some(b => 
+                    b.btn === 'K' && b.time < 3
+                );
+                
+                // Check if throw buttons are being pressed
+                const throwButtonsCurrentlyPressed = (punchPressed && kickPressed) || (punchPressed && recentKick) || (kickPressed && recentPunch);
+                
+                // Debug throw button state
+                if (this.isPlayer && (throwButtonsCurrentlyPressed || this.throwButtonsPressed)) {
+                    console.log('[THROW] Button state:', {
+                        currentlyPressed: throwButtonsCurrentlyPressed,
+                        previouslyPressed: this.throwButtonsPressed,
+                        canAttempt: throwButtonsCurrentlyPressed && !this.throwButtonsPressed
+                    });
+                }
+                
+                // Throw if both buttons pressed together OR within a small window
+                // BUT require button release between throw attempts
+                if (throwButtonsCurrentlyPressed && !this.throwButtonsPressed) {
+                    // Check if we can throw
+                    if (this.state !== 'attack' && this.state !== 'throwingOpponent' && 
+                        this.state !== 'beingThrown' && this.grounded && this.throwCooldown <= 0) {
+                        if (this.isPlayer) {
+                            console.log('[THROW] Attempting throw with punch+kick!');
+                        }
+                        this.attemptThrow();
+                        this.throwButtonsPressed = true;  // Mark buttons as pressed
+                        return;
+                    } else if (this.state === 'attack' && this.currentMove === 'throw') {
+                        // Already throwing, don't process other attacks
+                        this.throwButtonsPressed = true;  // Keep marking as pressed
+                    } else if (this.state === 'throwingOpponent') {
+                        // Already in throw animation, ignore inputs
+                        this.throwButtonsPressed = true;  // Keep marking as pressed
+                        return;
+                    }
+                } else if (!throwButtonsCurrentlyPressed) {
+                    // Buttons released - allow next throw attempt
+                    this.throwButtonsPressed = false;
                 }
                 
                 // Check for special moves first
                 if (this.state !== 'attack' || (this.currentMove && FRAME_DATA[this.currentMove].cancelable)) {
-                    // Shoryuken (Dragon Punch motion)
-                    if (this.inputBuffer.checkMotion('623') && (keys['u'] || keys['i'] || keys['o'])) {
-                        this.performSpecialMove('shoryuken');
-                        return;
+                    // Debug: log when buttons are pressed
+                    const punch = keys['u'];  // Punch
+                    const kick = keys['j'];   // Kick
+                    
+                    if (this.isPlayer && (punch || kick)) {
+                        console.log('[SPECIAL] Button pressed! Punch:', punch, 'Kick:', kick);
+                        console.log('[SPECIAL] Current buffer:', this.inputBuffer.directions.slice(-8).map(d => d.dir).join(''));
                     }
                     
-                    // Hadouken (Quarter Circle Forward)
-                    if (this.inputBuffer.checkMotion('236') && (keys['u'] || keys['i'] || keys['o'])) {
+                    // Check Hadouken first (Quarter Circle Forward)
+                    // This prevents false Shoryuken detection when doing back->hadouken
+                    if (this.inputBuffer.checkMotion('236') && punch) {
+                        console.log('[SPECIAL] HADOUKEN TRIGGERED!');
                         this.performSpecialMove('hadouken');
                         return;
                     }
                     
+                    // Shoryuken (Dragon Punch motion)
+                    // More strict - requires forward->down->down-forward without back input
+                    if (this.inputBuffer.checkMotion('623') && punch) {
+                        console.log('[SPECIAL] SHORYUKEN TRIGGERED!');
+                        this.performSpecialMove('shoryuken');
+                        return;
+                    }
+                    
                     // Tatsumaki (Quarter Circle Back)
-                    if (this.inputBuffer.checkMotion('214') && (keys['j'] || keys['k'] || keys['l'])) {
+                    if (this.inputBuffer.checkMotion('214') && kick) {
+                        console.log('[SPECIAL] TATSUMAKI TRIGGERED!');
                         this.performSpecialMove('tatsumaki');
                         return;
                     }
@@ -1642,36 +2432,20 @@
                     }
                 }
                 
-                // Normal attacks
-                if (this.state !== 'attack' || this.canCancelIntoNormal()) {
+                // Normal attacks - Simplified 2 BUTTON SYSTEM (respect throw cooldown)
+                if ((this.state !== 'attack' || this.canCancelIntoNormal()) && this.throwCooldown <= 0) {
                     if (!this.grounded) {
                         // Jumping attacks
-                        if (keys['u']) this.attack('jLP');
-                        else if (keys['i']) this.attack('jMP');
-                        else if (keys['o']) this.attack('jHP');
-                        else if (keys['j']) this.attack('jLK');
-                        else if (keys['k']) this.attack('jMK');
-                        else if (keys['l']) this.attack('jHK');
+                        if (keys['u']) this.attack('jP');
+                        else if (keys['j']) this.attack('jK');
                     } else if (this.crouching) {
                         // Crouching attacks
-                        if (keys['u']) this.attack('crLP');
-                        else if (keys['i']) this.attack('crMP');
-                        else if (keys['o']) this.attack('crHP');
-                        else if (keys['j']) this.attack('crLK');
-                        else if (keys['k']) this.attack('crMK');
-                        else if (keys['l']) this.attack('crHK');
+                        if (keys['u']) this.attack('crP');
+                        else if (keys['j']) this.attack('crK');
                     } else {
-                        // Standing attacks - check proximity
-                        const opponent = this.isPlayer ? aiPlayer : player;
-                        const distance = Math.abs(this.x - opponent.x);
-                        const isClose = distance < 80;
-                        
-                        if (keys['u']) this.attack('LP');
-                        else if (keys['i']) this.attack(isClose ? 'closeMP' : 'MP');
-                        else if (keys['o']) this.attack(isClose ? 'closeHP' : 'HP');
-                        else if (keys['j']) this.attack('LK');
-                        else if (keys['k']) this.attack(isClose ? 'closeMK' : 'MK');
-                        else if (keys['l']) this.attack(isClose ? 'closeHK' : 'HK');
+                        // Standing attacks
+                        if (keys['u']) this.attack('P');
+                        else if (keys['j']) this.attack('K');
                     }
                 }
             }
@@ -1703,6 +2477,12 @@
             }
 
             jump(direction) {
+                // Can only jump if grounded
+                if (!this.grounded) {
+                    console.log(`[${this.isPlayer ? 'PLAYER' : 'AI'}] Attempted to jump while airborne!`);
+                    return;
+                }
+                
                 this.velocityY = JUMP_VELOCITY_Y;
                 this.jumpDirection = direction;
                 this.velocityX = direction * JUMP_VELOCITY_X;
@@ -1726,6 +2506,11 @@
                 this.lastHitFrame = -999;  // Reset last hit frame
                 this.blocking = false;  // Clear blocking when attacking
                 this.inputBuffer.addButton(button);
+                
+                // Increment punch counter for variety
+                if (button === 'P') {
+                    this.punchCount++;
+                }
             }
 
             performSpecialMove(move) {
@@ -1758,19 +2543,33 @@
             }
 
             attemptThrow() {
+                // Don't attempt if already throwing
+                if (this.state === 'throwingOpponent' || this.state === 'beingThrown') {
+                    return;
+                }
+                
                 const opponent = this.isPlayer ? aiPlayer : player;
                 const distance = Math.abs(this.x - opponent.x);
                 
-                if (distance < THROW_RANGE && opponent.grounded && !opponent.knockdownFrames) {
-                    this.state = 'attack';
-                    this.currentMove = 'throw';
-                    this.moveFrame = 0;
-                    this.blocking = false;  // Clear blocking when attacking
-                    this.isThrowAttempt = true;
-                    
-                    // Give opponent tech window
-                    opponent.throwTechWindow = THROW_TECH_WINDOW;
+                // Always start throw animation
+                this.state = 'attack';
+                this.currentMove = 'throw';
+                this.moveFrame = 0;
+                this.currentMoveHits = 0;  // Reset hit counter - CRITICAL for collision detection
+                this.lastHitFrame = -999;  // Reset last hit frame
+                this.blocking = false;  // Clear blocking when attacking
+                this.isThrowAttempt = true;
+                this.throwCooldown = 60; // Longer cooldown to prevent spam
+                
+                // Step forward slightly during throw startup (first 3 frames)
+                const stepForward = distance > 60 && distance < THROW_RANGE;
+                if (stepForward) {
+                    // Move toward opponent during startup
+                    const direction = opponent.x > this.x ? 1 : -1;
+                    this.velocityX = direction * 2; // Small step forward
                 }
+                
+                // Don't set tech window here - let collision detection handle it
             }
 
             canCancelIntoNormal() {
@@ -1790,31 +2589,80 @@
                     return; // No hurtboxes during invincibility
                 }
                 
-                // Hurtboxes based on state
+                // Hurtboxes based on state - tightly encompass the character
+                const spriteScale = 0.41;
+                const spriteHeight = 728 * spriteScale; // ~298 pixels tall
+                const characterHeight = spriteHeight * 0.9; // Character takes up 90% of sprite
+                
                 if (this.knockdownFrames > 0) {
-                    this.hurtboxes.push({ x: -40, y: -20, width: 80, height: 20 });
+                    // Lying down hitbox - close to ground
+                    this.hurtboxes.push({ x: -100, y: -50, width: 200, height: 50 });
                 } else if (this.crouching) {
-                    this.hurtboxes.push({ x: -25, y: -60, width: 50, height: 60 });
+                    // Crouching - about 50% of character height
+                    const crouchHeight = characterHeight * 0.5;
+                    this.hurtboxes.push({ x: -60, y: -crouchHeight, width: 120, height: crouchHeight });
                 } else if (!this.grounded) {
-                    this.hurtboxes.push({ x: -25, y: -90, width: 50, height: 90 });
+                    // Jumping - full character height
+                    this.hurtboxes.push({ x: -60, y: -characterHeight + 20, width: 120, height: characterHeight - 20 });
                 } else {
-                    this.hurtboxes.push({ x: -25, y: -100, width: 50, height: 100 });
+                    // Standing hurtbox - from feet to head
+                    this.hurtboxes.push({ x: -60, y: -characterHeight, width: 120, height: characterHeight });
                 }
                 
-                // Attack hitboxes
-                if (this.state === 'attack' && this.currentMove) {
+                // Attack hitboxes - don't generate during throwing animation
+                if (this.state === 'attack' && this.currentMove && this.state !== 'throwingOpponent') {
                     const frameData = FRAME_DATA[this.currentMove];
-                    if (this.moveFrame >= frameData.startup && 
+                    if (frameData && this.moveFrame >= frameData.startup && 
                         this.moveFrame < frameData.startup + frameData.active) {
                         
                         if (this.currentMove === 'throw') {
-                            this.hitboxes.push({
-                                x: this.facing === 1 ? 10 : -60,
-                                y: -80,
-                                width: 50,
-                                height: 60,
-                                type: 'throw'
-                            });
+                            // Check distance again during active frames
+                            const opponent = this.isPlayer ? aiPlayer : player;
+                            const distance = Math.abs(this.x - opponent.x);
+                            
+                            if (this.isPlayer) {
+                                console.log('[THROW] Active frame check:', {
+                                    frame: this.moveFrame,
+                                    distance: distance,
+                                    inRange: distance < THROW_RANGE,
+                                    opponentGrounded: opponent.grounded
+                                });
+                            }
+                            
+                            // Only create throw hitbox if in range and opponent is throwable
+                            if (distance < THROW_RANGE && opponent.grounded && !opponent.knockdownFrames) {
+                                // Position throw hitbox based on opponent's position
+                                const opponentDirection = opponent.x > this.x ? 1 : -1;
+                                
+                                if (this.isPlayer) {
+                                    console.log('[THROW] Opponent direction:', {
+                                        playerX: this.x,
+                                        opponentX: opponent.x,
+                                        opponentIsToTheRight: opponentDirection === 1
+                                    });
+                                }
+                                
+                                const throwHitbox = {
+                                    x: opponentDirection === 1 ? 10 : -80,  // Hitbox toward opponent
+                                    y: -80,
+                                    width: 80,  // Wide hitbox
+                                    height: 80,  // Tall hitbox
+                                    type: 'throw'
+                                };
+                                
+                                this.hitboxes.push(throwHitbox);
+                                
+                                if (this.isPlayer) {
+                                    console.log('[THROW] Hitbox created!', {
+                                        x: throwHitbox.x,
+                                        y: throwHitbox.y,
+                                        width: throwHitbox.width,
+                                        height: throwHitbox.height,
+                                        fighterX: this.x,
+                                        opponentX: opponent.x
+                                    });
+                                }
+                            }
                         } else if (this.currentMove.includes('P') || this.currentMove.includes('punch')) {
                             // Punch hitboxes
                             let reach = 50;
@@ -1823,9 +2671,9 @@
                             
                             this.hitboxes.push({
                                 x: this.facing === 1 ? 25 : -25 - reach,
-                                y: this.currentMove.includes('cr') ? -40 : -80,
+                                y: this.currentMove.includes('cr') ? -50 : -100,  // Adjusted for larger sprites
                                 width: reach,
-                                height: 25
+                                height: 30
                             });
                         } else if (this.currentMove.includes('K') || this.currentMove === 'tatsumaki') {
                             // Kick hitboxes
@@ -1835,17 +2683,17 @@
                             
                             this.hitboxes.push({
                                 x: this.facing === 1 ? 25 : -25 - reach,
-                                y: this.currentMove.includes('cr') ? -30 : this.currentMove.includes('j') ? -40 : -60,
+                                y: this.currentMove.includes('cr') ? -40 : this.currentMove.includes('j') ? -60 : -80,  // Adjusted for larger sprites
                                 width: reach,
-                                height: 30
+                                height: 35
                             });
                         } else if (this.currentMove === 'shoryuken') {
                             // Rising uppercut hitbox
                             this.hitboxes.push({
                                 x: this.facing === 1 ? 10 : -40,
-                                y: -100,
-                                width: 30,
-                                height: 80
+                                y: -120,  // Adjusted for larger sprites
+                                width: 35,
+                                height: 100
                             });
                         }
                     }
@@ -1859,36 +2707,141 @@
                 // Update invincibility
                 if (this.invincibleFrames > 0) this.invincibleFrames--;
                 
-                // Update throw tech window
-                if (this.throwTechWindow > 0) {
-                    this.throwTechWindow--;
-                    // Check for tech input
-                    if (this.throwTechWindow > 0 && this.inputBuffer.checkButton('throw')) {
-                        // Successful tech
-                        this.pushbackVelocity = -this.facing * 3;
-                        this.throwTechWindow = 0;
-                    }
+                // Clean up stuck beingThrown state (but not during active throw)
+                if (this.beingThrown && this.state !== 'beingThrown' && 
+                    (!this.throwAttacker || this.throwAttacker.state !== 'throwingOpponent')) {
+                    console.log('[THROW] Cleaning up stuck beingThrown state', {
+                        beingThrown: this.beingThrown,
+                        state: this.state,
+                        throwAttacker: this.throwAttacker ? this.throwAttacker.state : 'null'
+                    });
+                    this.beingThrown = false;
+                    this.throwAttacker = null;
+                    this.throwAnimationFrame = 0;
                 }
                 
-                // Update stun states
-                if (this.hitstunFrames > 0) {
-                    this.hitstunFrames--;
-                    this.state = 'hitstun';
-                } else if (this.blockstunFrames > 0) {
-                    this.blockstunFrames--;
-                    this.state = 'blockstun';
-                } else if (this.knockdownFrames > 0) {
-                    this.knockdownFrames--;
-                    this.state = 'knockdown';
-                    if (this.knockdownFrames === 0) {
-                        this.state = 'idle';
-                        this.y = GROUND_Y;
+                // Decrement cooldowns
+                if (this.throwCooldown > 0) this.throwCooldown--;
+                
+                // Handle being thrown animation
+                if (this.state === 'beingThrown' && this.throwAttacker) {
+                    this.throwAnimationFrame++;
+                    
+                    if (this.isPlayer) {
+                        console.log('[THROW] Being thrown animation frame:', this.throwAnimationFrame);
                     }
-                } else if (this.isDizzy) {
-                    this.state = 'dizzy';
-                } else if (this.state === 'hitstun' || this.state === 'blockstun') {
-                    // Reset to idle if we were in hitstun/blockstun but frames are 0
-                    this.state = 'idle';
+                    
+                    // Stick to attacker during throw
+                    const throwDuration = 30;
+                    if (this.throwAnimationFrame < throwDuration) {
+                        // Determine throw direction based on available space
+                        const distanceToLeftWall = this.throwAttacker.x;
+                        const distanceToRightWall = canvas.width - this.throwAttacker.x;
+                        const throwDirection = distanceToLeftWall > distanceToRightWall ? -1 : 1;
+                        
+                        // Position victim relative to attacker
+                        const progress = this.throwAnimationFrame / throwDuration;
+                        
+                        // Graceful arc motion - like a judo throw
+                        const liftHeight = Math.sin(progress * Math.PI) * 60;  // Moderate lift
+                        const arcMotion = Math.sin(progress * Math.PI) * 20;  // Smooth arc
+                        const offsetX = throwDirection * (30 + progress * 80);  // Reasonable distance
+                        
+                        this.x = this.throwAttacker.x + offsetX;
+                        this.y = this.throwAttacker.y - 50 - liftHeight;
+                        
+                        // Store throw direction for launch
+                        this.throwDirection = throwDirection;
+                        
+                        // Gentle rotation - just one flip
+                        this.rotation = progress * Math.PI * 2;  // One graceful rotation
+                    } else {
+                        // Throw complete - launch the victim gracefully
+                        console.log('[THROW] Launch phase!', {
+                            victim: this.isPlayer ? 'PLAYER' : 'AI',
+                            throwDirection: this.throwDirection,
+                            velocityBefore: this.velocityX
+                        });
+                        
+                        this.state = 'knockdown';
+                        this.knockdownFrames = 50;  // Reasonable knockdown time
+                        this.velocityY = -12;  // Clean arc
+                        this.velocityX = (this.throwDirection || 1) * 50;  // Half screen distance
+                        this.pushbackVelocity = 0;
+                        this.rotation = 0;
+                        this.beingThrown = false;
+                        
+                        console.log('[THROW] Launch velocities set!', {
+                            velocityX: this.velocityX,
+                            velocityY: this.velocityY,
+                            state: this.state
+                        });
+                        
+                        // Apply throw damage
+                        this.takeDamage(12, 0, 0, 0, true, this.throwAttacker);
+                        
+                        // Create impact particles for dramatic effect
+                        for (let i = 0; i < 8; i++) {
+                            particles.push(new Particle(
+                                this.x + (Math.random() - 0.5) * 40,
+                                this.y - 50,
+                                'impact'
+                            ));
+                        }
+                        
+                        // Clear throw reference
+                        this.throwAttacker = null;
+                        
+                        // Screen shake for impact
+                        screenShake = 6;  // Moderate screen shake
+                    }
+                    return; // Skip normal physics
+                }
+                
+                // Handle throwing animation
+                if (this.state === 'throwingOpponent') {
+                    this.throwAnimationFrame++;
+                    
+                    if (this.isPlayer) {
+                        console.log('[THROW] Throwing animation frame:', this.throwAnimationFrame);
+                    }
+                    
+                    if (this.throwAnimationFrame >= 30) {
+                        // Animation complete
+                        this.state = 'idle';
+                        this.currentMove = null;
+                        this.throwAnimationFrame = 0;
+                        this.throwCooldown = 20; // Add cooldown after throw completes
+                        
+                        // Don't reset opponent here - let their beingThrown animation complete naturally
+                    }
+                    return; // Skip normal attack processing
+                }
+                
+                // Update stun states - but not if being thrown
+                if (this.state !== 'beingThrown' && this.state !== 'throwingOpponent') {
+                    if (this.hitstunFrames > 0) {
+                        this.hitstunFrames--;
+                        this.state = 'hitstun';
+                    } else if (this.blockstunFrames > 0) {
+                        this.blockstunFrames--;
+                        this.state = 'blockstun';
+                    } else if (this.knockdownFrames > 0) {
+                        this.knockdownFrames--;
+                        this.state = 'knockdown';
+                        if (this.knockdownFrames === 0) {
+                            this.state = 'idle';
+                            this.y = GROUND_Y;
+                            this.rotation = 0;  // Reset rotation after knockdown
+                        }
+                    } else if (this.isDizzy) {
+                        this.state = 'dizzy';
+                        this.rotation = 0;  // Reset rotation
+                    } else if (this.state === 'hitstun' || this.state === 'blockstun') {
+                        // Reset to idle if we were in hitstun/blockstun but frames are 0
+                        this.state = 'idle';
+                        this.rotation = 0;  // Reset rotation
+                    }
                 }
                 
                 // Update dizzy state
@@ -1904,11 +2857,23 @@
                     this.moveFrame++;
                     const frameData = FRAME_DATA[this.currentMove];
                     
+                    // Check if frameData exists (move might have been removed)
+                    if (!frameData) {
+                        console.error(`[FIGHTER] Invalid move: ${this.currentMove} not found in FRAME_DATA`);
+                        this.endAttack();
+                        return;
+                    }
+                    
                     // Spawn projectile for hadouken
                     if (this.currentMove === 'hadouken' && this.moveFrame === frameData.startup) {
+                        // Spawn from fist position
+                        // When punching forward, fist is extended forward and at shoulder height
+                        const fistOffsetX = this.facing * 45;  // Extended arm reach
+                        const fistOffsetY = -110;  // Higher up - at actual fist height on the sprite
+                        
                         this.projectiles.push(new Projectile(
-                            this.x + this.facing * 60,
-                            this.y - 60,
+                            this.x + fistOffsetX,
+                            this.y + fistOffsetY,
                             this.facing,
                             this,
                             frameData
@@ -1922,6 +2887,10 @@
                             this.endAttack();
                         }
                     } else if (this.moveFrame >= frameData.startup + frameData.active + frameData.recovery) {
+                        // Debug log for hadouken
+                        if (this.currentMove === 'hadouken') {
+                            console.log('[HADOUKEN] Ending move at frame:', this.moveFrame);
+                        }
                         this.endAttack();
                     }
                 }
@@ -1931,8 +2900,23 @@
                     this.velocityY += GRAVITY;
                 }
                 
+                // Track position for debugging teleport issues
+                const oldX = this.x;
+                const oldY = this.y;
+                
                 this.y += this.velocityY;
                 this.x += this.velocityX + this.pushbackVelocity;
+                
+                // Debug large position changes
+                if (this.isPlayer && (Math.abs(this.x - oldX) > 50 || Math.abs(this.y - oldY) > 50)) {
+                    console.log('[PLAYER] Large position change detected!', {
+                        oldPos: {x: oldX, y: oldY},
+                        newPos: {x: this.x, y: this.y},
+                        state: this.state,
+                        move: this.currentMove,
+                        velocities: {x: this.velocityX, y: this.velocityY, pushback: this.pushbackVelocity}
+                    });
+                }
                 
                 // Ground collision
                 if (this.y >= GROUND_Y) {
@@ -1953,16 +2937,42 @@
                     this.grounded = false;
                 }
                 
-                // Friction
+                // Friction (but not during throw startup to allow stepping forward)
                 if (this.grounded) {
-                    this.velocityX *= 0.85;
+                    // Don't apply friction during throw startup frames
+                    if (!(this.currentMove === 'throw' && this.moveFrame < 3)) {
+                        this.velocityX *= 0.85;
+                    }
                 }
                 this.pushbackVelocity *= 0.9;
                 
-                // Bounds
-                this.x = Math.max(50, Math.min(canvas.width - 50, this.x));
+                // Bounds - smooth clamping to prevent teleporting
+                const margin = 50;
+                const oldBoundedX = this.x;
+                if (this.x < margin) {
+                    this.x = margin;
+                    this.velocityX = Math.max(0, this.velocityX); // Stop leftward movement
+                } else if (this.x > canvas.width - margin) {
+                    this.x = canvas.width - margin;
+                    this.velocityX = Math.min(0, this.velocityX); // Stop rightward movement
+                }
                 
-                // Facing is now updated in handleInput for better cross-up handling
+                // Debug if bounds caused a large change
+                if (this.isPlayer && Math.abs(this.x - oldBoundedX) > 30) {
+                    console.log('[PLAYER] Bounds correction:', {from: oldBoundedX, to: this.x});
+                }
+                
+                // Update facing for auto-face (for both player and AI)
+                const opponent = this.isPlayer ? aiPlayer : player;
+                if (opponent && !this.knockdownFrames && this.state !== 'beingThrown' && this.state !== 'throwingOpponent') {
+                    const oldFacing = this.facing;
+                    this.facing = this.x < opponent.x ? 1 : -1;
+                    
+                    // If facing changed (cross-up), log it
+                    if (oldFacing !== this.facing) {
+                        console.log(`[${this.isPlayer ? 'PLAYER' : 'AI'}] Facing changed from ${oldFacing} to ${this.facing}`);
+                    }
+                }
                 
                 // Update hitboxes
                 this.updateHitboxes();
@@ -2001,6 +3011,25 @@
             }
 
             endAttack() {
+                // If we just finished a throw attempt, add a small cooldown
+                if (this.currentMove === 'throw') {
+                    this.throwCooldown = 10;  // Prevent immediate attacks after throw
+                    
+                    // Reset any stuck beingThrown state on the opponent
+                    const opponent = this.isPlayer ? aiPlayer : player;
+                    if (opponent.beingThrown && opponent.state !== 'beingThrown') {
+                        console.log('[THROW] Resetting stuck beingThrown flag on opponent');
+                        opponent.beingThrown = false;
+                        opponent.throwAttacker = null;
+                        opponent.throwAnimationFrame = 0;
+                    }
+                }
+                
+                // Debug log for special moves
+                if (this.currentMove === 'hadouken' || this.currentMove === 'shoryuken' || this.currentMove === 'tatsumaki') {
+                    console.log(`[FIGHTER] Ending special move: ${this.currentMove}`);
+                }
+                
                 this.state = 'idle';
                 this.currentMove = null;
                 this.moveFrame = 0;
@@ -2069,36 +3098,6 @@
                     this.blockstunFrames = blockstun;
                     this.pushbackVelocity = -this.facing * pushback * 0.6;
                     
-                    // Show "BLOCK DETECTED" text
-                    particles.push({
-                        x: this.x,
-                        y: this.y - 150,
-                        life: 60,
-                        type: 'blockText',
-                        text: 'BLOCK DETECTED',
-                        scale: 1,
-                        update() {
-                            this.life--;
-                            if (this.life > 50) {
-                                this.scale = Math.min(1.5, this.scale + 0.1);
-                            } else if (this.life < 10) {
-                                this.scale *= 0.9;
-                            }
-                        },
-                        draw() {
-                            ctx.save();
-                            ctx.globalAlpha = Math.min(1, this.life / 10);
-                            ctx.font = `bold ${20 * this.scale}px Arial`;
-                            ctx.fillStyle = '#00ff00';
-                            ctx.strokeStyle = '#000';
-                            ctx.lineWidth = 3;
-                            ctx.textAlign = 'center';
-                            ctx.strokeText(this.text, this.x, this.y);
-                            ctx.fillText(this.text, this.x, this.y);
-                            ctx.restore();
-                        }
-                    });
-                    
                     // Show chip damage number
                     if (chipDamage > 0) {
                         particles.push({
@@ -2163,10 +3162,29 @@
                         ));
                     }
                     
-                    // Hit spark effect
+                    // Hit spark effect - position at impact point
+                    // Get the actual hit location from the attacker's move data
+                    let sparkX = this.x + this.facing * 30;
+                    let sparkY = this.y - 150; // Default to mid-body
+                    
+                    // If we have attacker info and move data with impact point
+                    if (attacker && attacker.currentMove) {
+                        const moveData = FRAME_DATA[attacker.currentMove];
+                        if (moveData && moveData.impactPoint) {
+                            // Use the predefined impact point, adjusted for facing
+                            sparkX = attacker.x + (attacker.facing === 1 ? moveData.impactPoint.x : -moveData.impactPoint.x);
+                            sparkY = attacker.y + moveData.impactPoint.y;
+                        } else if (attacker.hitboxes.length > 0) {
+                            // Fallback to hitbox center
+                            const hitbox = attacker.hitboxes[0];
+                            sparkX = attacker.x + hitbox.x + hitbox.width / 2;
+                            sparkY = attacker.y + hitbox.y + hitbox.height / 2;
+                        }
+                    }
+                    
                     particles.push({
-                        x: this.x + this.facing * 30,
-                        y: this.y - 60,
+                        x: sparkX,
+                        y: sparkY,
                         life: 15,
                         type: 'hitSpark',
                         size: 40,
@@ -2262,7 +3280,7 @@
                 ctx.font = 'bold 20px Arial';
                 ctx.shadowColor = this.isPlayer ? '#00ff00' : '#ff0000';
                 ctx.shadowBlur = 10;
-                ctx.fillText(this.isPlayer ? 'PLAYER 1' : 'CPU', x + 5, y - 8);
+                ctx.fillText(this.isPlayer ? 'ELON MUSK' : 'DONALD TRUMP', x + 5, y - 8);
                 ctx.shadowBlur = 0;
                 
                 // Stun gauge
@@ -2308,9 +3326,128 @@
                 }
             }
 
-            draw() {
+            draw(renderAttacks = true) {
+                // Render character body
                 this.drawCharacterSprite();
+                
+                // Render attacks based on character-specific layering
+                if (renderAttacks && this.state === 'attack' && this.currentMove) {
+                    this.drawAttackLayer();
+                }
+                
                 this.drawHealthBar(this.isPlayer ? 50 : 560, 50);
+                
+                // Debug facing indicator
+                if (SPRITE_DEBUG_MODE) {
+                    ctx.save();
+                    ctx.fillStyle = this.isPlayer ? '#00ff00' : '#ff0000';
+                    ctx.font = 'bold 16px monospace';
+                    ctx.textAlign = 'center';
+                    const arrow = this.facing === 1 ? '→' : '←';
+                    ctx.fillText(`Facing: ${arrow}`, this.x, this.y - 120);
+                    ctx.restore();
+                }
+                
+                // Debug hitbox/hurtbox visualization
+                if (HITBOX_DEBUG_MODE) {
+                    ctx.save();
+                    
+                    // Draw hurtboxes (where you can be hit) in blue
+                    ctx.strokeStyle = this.isPlayer ? '#0088ff' : '#8800ff';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([5, 5]);
+                    this.hurtboxes.forEach(box => {
+                        ctx.strokeRect(
+                            this.x + box.x,
+                            this.y + box.y,
+                            box.width,
+                            box.height
+                        );
+                    });
+                    
+                    // Draw hitboxes (where you can hit) in red/green
+                    ctx.strokeStyle = this.isPlayer ? '#00ff00' : '#ff0000';
+                    ctx.lineWidth = 3;
+                    ctx.setLineDash([]);
+                    this.hitboxes.forEach(box => {
+                        if (box.type === 'throw') {
+                            ctx.strokeStyle = '#ffff00';  // Yellow for throws
+                        }
+                        ctx.strokeRect(
+                            this.x + box.x,
+                            this.y + box.y,
+                            box.width,
+                            box.height
+                        );
+                        
+                        // Label the hitbox type
+                        ctx.fillStyle = ctx.strokeStyle;
+                        ctx.font = '12px monospace';
+                        ctx.fillText(
+                            box.type || 'hit',
+                            this.x + box.x + 2,
+                            this.y + box.y + 12
+                        );
+                    });
+                    
+                    // Draw character center point
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    ctx.restore();
+                }
+            }
+            
+            drawAttackLayer() {
+                // Draw attack effects based on the current move
+                if (!this.currentMove || this.state !== 'attack') return;
+                
+                // Get current sprite for accurate positioning
+                const spriteKey = this.getSpriteKey();
+                
+                // Draw attack trail effects for special moves
+                if (this.currentMove === 'tatsumaki' || this.currentMove === 'shoryuken') {
+                    ctx.save();
+                    ctx.globalAlpha = 0.6;
+                    
+                    // Draw motion blur effect
+                    for (let i = 1; i <= 3; i++) {
+                        ctx.globalAlpha = 0.6 - (i * 0.15);
+                        ctx.save();
+                        ctx.translate(this.x - (this.facing * i * 15), this.y - (i * 5));
+                        this.drawCharacterSprite(true);
+                        ctx.restore();
+                    }
+                    
+                    ctx.restore();
+                }
+                
+                // Remove the green/red glow effect - it was too distracting
+            }
+            
+            getSpriteKey() {
+                // Get the current sprite key for this state
+                let spriteState = 'idle';
+                
+                if (this.state === 'attack' && this.currentMove) {
+                    if (this.currentMove === 'P' && this.characterName === 'elon') {
+                        spriteState = (this.punchCount % 2 === 0) ? 'punch' : 'punch2';
+                    } else {
+                        const moveSpriteMap = {
+                            'P': 'punch',
+                            'K': 'kick-standing',
+                            'crP': 'crouch-punch',
+                            'crK': 'crouch-kick',
+                            'jP': 'jumppunch-elon',
+                            'jK': 'jump-kick'
+                        };
+                        spriteState = moveSpriteMap[this.currentMove] || this.currentMove;
+                    }
+                }
+                
+                return spriteState;
             }
         }
 
@@ -2389,45 +3526,93 @@
             }
         }
 
-        // All the frame data and input system classes remain the same
+        // Advanced frame data with precise hitbox definitions - scaled for large sprites
         const FRAME_DATA = {
-            // Standing normals - REDUCED DAMAGE
-            LP: { startup: 3, active: 2, recovery: 6, damage: 2, hitstun: 11, blockstun: 9, pushback: 1, cancelable: true },
-            MP: { startup: 5, active: 3, recovery: 9, damage: 4, hitstun: 16, blockstun: 14, pushback: 2, cancelable: true },
-            HP: { startup: 8, active: 4, recovery: 18, damage: 7, hitstun: 22, blockstun: 18, pushback: 4, cancelable: false },
-            LK: { startup: 4, active: 3, recovery: 7, damage: 2, hitstun: 12, blockstun: 10, pushback: 1, cancelable: true },
-            MK: { startup: 7, active: 4, recovery: 11, damage: 5, hitstun: 18, blockstun: 15, pushback: 3, cancelable: false },
-            HK: { startup: 10, active: 5, recovery: 20, damage: 8, hitstun: 24, blockstun: 20, pushback: 5, cancelable: false },
+            // Standing attacks - hitboxes represent fist/foot position
+            P: { 
+                startup: 5, active: 3, recovery: 12, damage: 5, 
+                hitstun: 16, blockstun: 13, pushback: 2, cancelable: true,
+                hitboxes: [
+                    { x: 90, y: -230, width: 60, height: 50 }  // Fist at shoulder height
+                ],
+                // Impact point - where the fist actually is in the sprite
+                impactPoint: { x: 120, y: -230 }
+            },
+            K: { 
+                startup: 7, active: 4, recovery: 18, damage: 7, 
+                hitstun: 20, blockstun: 17, pushback: 4, cancelable: false,
+                hitboxes: [
+                    { x: 100, y: -180, width: 70, height: 60 },  // Knee/thigh
+                    { x: 130, y: -120, width: 60, height: 50 }   // Foot extension
+                ],
+                // Impact point - where the foot strikes (same height as punch for high kick)
+                impactPoint: { x: 160, y: -230 }
+            },
             
-            // Close normals
-            closeMP: { startup: 4, active: 3, recovery: 8, damage: 4, hitstun: 16, blockstun: 14, pushback: 1, cancelable: true },
-            closeHP: { startup: 6, active: 4, recovery: 14, damage: 7, hitstun: 22, blockstun: 18, pushback: 2, cancelable: true },
-            closeMK: { startup: 5, active: 4, recovery: 10, damage: 5, hitstun: 18, blockstun: 15, pushback: 2, cancelable: true },
-            closeHK: { startup: 8, active: 5, recovery: 16, damage: 8, hitstun: 24, blockstun: 20, pushback: 3, cancelable: false },
+            // Crouching attacks
+            crP: { 
+                startup: 4, active: 3, recovery: 10, damage: 4, 
+                hitstun: 14, blockstun: 11, pushback: 1, cancelable: true, low: false,
+                hitboxes: [
+                    { x: 80, y: -140, width: 56, height: 44 }  // Lower fist position
+                ],
+                impactPoint: { x: 108, y: -140 }
+            },
+            crK: { 
+                startup: 6, active: 4, recovery: 16, damage: 6, 
+                hitstun: 0, blockstun: 14, pushback: 3, knockdown: true, low: true,
+                hitboxes: [
+                    { x: 90, y: -50, width: 80, height: 40 }  // Sweep at foot level
+                ],
+                impactPoint: { x: 130, y: -50 }
+            },
             
-            // Crouching normals
-            crLP: { startup: 3, active: 2, recovery: 6, damage: 2, hitstun: 10, blockstun: 8, pushback: 0, cancelable: true, low: false },
-            crMP: { startup: 5, active: 3, recovery: 9, damage: 3, hitstun: 15, blockstun: 13, pushback: 1, cancelable: true, low: false },
-            crHP: { startup: 7, active: 4, recovery: 16, damage: 6, hitstun: 20, blockstun: 17, pushback: 3, cancelable: true, low: false },
-            crLK: { startup: 4, active: 2, recovery: 7, damage: 2, hitstun: 11, blockstun: 9, pushback: 0, cancelable: true, low: true },
-            crMK: { startup: 6, active: 3, recovery: 11, damage: 4, hitstun: 16, blockstun: 14, pushback: 2, cancelable: true, low: true },
-            crHK: { startup: 9, active: 5, recovery: 22, damage: 6, hitstun: 0, blockstun: 18, pushback: 4, knockdown: true, low: true },
-            
-            // Jumping normals
-            jLP: { startup: 5, active: 10, recovery: 0, damage: 3, hitstun: 14, blockstun: 12, pushback: 1 },
-            jMP: { startup: 6, active: 8, recovery: 0, damage: 5, hitstun: 18, blockstun: 16, pushback: 2 },
-            jHP: { startup: 8, active: 6, recovery: 0, damage: 7, hitstun: 22, blockstun: 20, pushback: 3 },
-            jLK: { startup: 5, active: 10, recovery: 0, damage: 3, hitstun: 14, blockstun: 12, pushback: 1 },
-            jMK: { startup: 7, active: 8, recovery: 0, damage: 5, hitstun: 18, blockstun: 16, pushback: 2 },
-            jHK: { startup: 9, active: 6, recovery: 0, damage: 7, hitstun: 22, blockstun: 20, pushback: 3 },
+            // Jumping attacks
+            jP: { 
+                startup: 6, active: 8, recovery: 0, damage: 6, 
+                hitstun: 18, blockstun: 15, pushback: 2,
+                hitboxes: [
+                    { x: 80, y: -40, width: 64, height: 56 }  // Downward fist
+                ],
+                impactPoint: { x: 112, y: -40 }
+            },
+            jK: { 
+                startup: 8, active: 6, recovery: 0, damage: 8, 
+                hitstun: 22, blockstun: 18, pushback: 3,
+                hitboxes: [
+                    { x: 90, y: -20, width: 90, height: 70 }  // Extended jump kick
+                ],
+                impactPoint: { x: 135, y: -20 }
+            },
             
             // Special moves
-            hadouken: { startup: 13, active: 40, recovery: 40, damage: 8, hitstun: 20, blockstun: 16, pushback: 3, projectile: true },
-            shoryuken: { startup: 3, active: 14, recovery: 43, damage: 12, hitstun: 30, blockstun: 0, pushback: 5, invincible: 8, knockdown: true },
-            tatsumaki: { startup: 11, active: 24, recovery: 18, damage: 4, hitstun: 18, blockstun: 16, pushback: 4, hits: 3 },
+            hadouken: { 
+                startup: 13, active: 40, recovery: 40, damage: 8, 
+                hitstun: 20, blockstun: 16, pushback: 3, projectile: true,
+                hitboxes: []  // Projectile handles its own collision
+            },
+            shoryuken: { 
+                startup: 3, active: 14, recovery: 43, damage: 12, 
+                hitstun: 30, blockstun: 0, pushback: 5, invincible: 8, knockdown: true,
+                hitboxes: [
+                    { x: 50, y: -280, width: 70, height: 280 }  // Rising uppercut
+                ]
+            },
+            tatsumaki: { 
+                startup: 11, active: 24, recovery: 18, damage: 4, 
+                hitstun: 18, blockstun: 16, pushback: 4, hits: 3,
+                hitboxes: [
+                    { x: 100, y: -160, width: 80, height: 120 }  // Spinning kick
+                ]
+            },
             
             // Throw
-            throw: { startup: 3, active: 2, recovery: 24, damage: 12, range: THROW_RANGE }
+            throw: { 
+                startup: 3, active: 2, recovery: 24, damage: 12, range: THROW_RANGE,
+                hitboxes: [
+                    { x: 70, y: -200, width: 60, height: 160, type: 'throw' }
+                ]
+            }
         };
 
         // Input buffer system
@@ -2454,17 +3639,78 @@
                 this.directions.forEach(d => d.time++);
                 this.buttons.forEach(b => b.time++);
                 
-                // Remove old inputs
-                this.directions = this.directions.filter(d => d.time < 30);
-                this.buttons = this.buttons.filter(b => b.time < 10);
+                // Remove old inputs - increased window for gamepad
+                this.directions = this.directions.filter(d => d.time < 45); // Increased from 30
+                this.buttons = this.buttons.filter(b => b.time < 15); // Increased from 10
             }
 
             checkMotion(motion) {
-                const recent = this.directions.slice(-motion.length);
+                // Make motion detection more lenient
+                // Check last 12 directions for the pattern (increased for gamepad)
+                const recent = this.directions.slice(-12);
                 if (recent.length < motion.length) return false;
                 
+                // Join all recent directions
                 const motionStr = recent.map(d => d.dir).join('');
-                return motionStr.includes(motion);
+                
+                // Debug log for player - only log when actually checking (not every frame)
+                console.log('[INPUT] Checking motion:', motion, 'in buffer:', motionStr, '| Recent inputs age:', recent.map(d => d.time));
+                
+                // Check if motion exists anywhere in recent buffer
+                if (motionStr.includes(motion)) {
+                    console.log('[INPUT] Motion matched!', motion);
+                    return true;
+                }
+                
+                // Also check with some leniency - allow skipping neutral (5)
+                const cleanedMotion = motionStr.replace(/5/g, '');
+                if (cleanedMotion.includes(motion)) {
+                    console.log('[INPUT] Motion matched with leniency!', motion);
+                    return true;
+                }
+                
+                // Additional leniency for gamepad - allow intermediate directions
+                // But be more strict to prevent false positives
+                if (motion === '236') {
+                    // Hadouken - down->down-forward->forward motion
+                    // Check last 8 inputs for the pattern
+                    const recentStr = recent.slice(-8).map(d => d.dir).join('');
+                    
+                    // Match Hadouken patterns
+                    if (recentStr.includes('236') ||           // Direct motion
+                        recentStr.match(/2[35]*6/) ||          // With optional diagonal
+                        recentStr.match(/[14]?2[35]*6/) ||     // Allow back->down->forward (common in quarter circles)
+                        cleanedMotion.includes('236')) {       // Clean motion anywhere
+                        console.log('[INPUT] Hadouken motion matched with gamepad leniency!');
+                        return true;
+                    }
+                } else if (motion === '623') {
+                    // Shoryuken - forward->down->down-forward (dragon punch)
+                    // Must be more strict - no back input before the motion
+                    const recentStr = recent.slice(-6).map(d => d.dir).join('');
+                    
+                    // Check if we have a proper Shoryuken motion
+                    // Must NOT have back (4) immediately before the 623 motion
+                    if (recentStr.match(/6[25]?3$/) ||         // Ends with proper 623
+                        (recentStr.match(/[^4]623/) && !recentStr.match(/4.*623/)) ||  // Has 623 but no 4 before it
+                        (recentStr === '623')) {                // Exact motion
+                        console.log('[INPUT] Shoryuken motion matched with gamepad leniency!');
+                        return true;
+                    }
+                } else if (motion === '214') {
+                    // Tatsumaki - down->down-back->back motion
+                    const recentStr = recent.slice(-8).map(d => d.dir).join('');
+                    
+                    if (recentStr.includes('214') ||           // Direct motion anywhere
+                        recentStr.match(/2[15]*4/) ||          // With optional diagonal
+                        recentStr.match(/[36]?2[15]*4/) ||     // Allow forward->down->back
+                        cleanedMotion.includes('214')) {       // Clean motion anywhere
+                        console.log('[INPUT] Tatsumaki motion matched with gamepad leniency!');
+                        return true;
+                    }
+                }
+                
+                return false;
             }
 
             checkButton(btn) {
@@ -2493,6 +3739,34 @@
                     return;
                 }
                 
+                // Check if AI attacks are disabled for testing
+                if (aiAttackDisabled) {
+                    // AI won't attack or block - stands still like a training dummy
+                    const distance = Math.abs(this.fighter.x - player.x);
+                    
+                    // Disable blocking completely
+                    this.fighter.blocking = false;
+                    
+                    // Just stand still - no movement at all
+                    // This makes it easier to test throws and combos
+                    // BUT don't override velocity during knockdown or being thrown!
+                    if (this.fighter.state !== 'knockdown' && 
+                        this.fighter.state !== 'beingThrown' &&
+                        this.fighter.state !== 'hitstun') {
+                        this.fighter.velocityX = 0;
+                    }
+                    
+                    // Only set to idle if not in a special state
+                    if (this.fighter.state !== 'beingThrown' && 
+                        this.fighter.state !== 'throwingOpponent' &&
+                        this.fighter.state !== 'knockdown' &&
+                        this.fighter.state !== 'hitstun') {
+                        this.fighter.state = 'idle';
+                    }
+                    
+                    return;
+                }
+                
                 const distance = Math.abs(this.fighter.x - player.x);
                 const heightDiff = player.y - this.fighter.y;
                 
@@ -2510,7 +3784,7 @@
                 if (player.state === 'attack' && distance < 150) {
                     if (Math.random() < 0.8) {
                         this.fighter.blocking = true;
-                        this.fighter.crouching = player.currentMove && player.currentMove.includes('cr');
+                        this.fighter.crouching = player.currentMove && (player.currentMove === 'crP' || player.currentMove === 'crK');
                         this.reactionTimer = 10;
                         return;
                     }
@@ -2518,38 +3792,41 @@
                 
                 // Offensive patterns
                 if (distance > 200) {
-                    // Approach
-                    if (Math.random() < 0.3) {
+                    // Approach - heavily favor walking over jumping
+                    const r = Math.random();
+                    if (r < 0.05) {  // Only 5% chance to jump (was 30%)
                         this.fighter.jump(1);
                         this.reactionTimer = 40;
-                    } else if (Math.random() < 0.1) {
+                    } else if (r < 0.15) {  // 10% chance for fireball
                         // Fireball
                         this.fighter.inputBuffer.addDirection('2');
                         this.fighter.inputBuffer.addDirection('3');
                         this.fighter.inputBuffer.addDirection('6');
                         this.fighter.performSpecialMove('hadouken');
                         this.reactionTimer = 60;
-                    } else {
-                        this.fighter.walk(1);
-                        this.reactionTimer = 5;
+                    } else {  // 85% chance to walk forward
+                        // Walk towards player
+                        const direction = player.x > this.fighter.x ? 1 : -1;
+                        this.fighter.walk(direction);
+                        this.reactionTimer = 3;  // Shorter timer for smoother walking
                     }
                 } else if (distance < 70) {
                     // Close combat
                     const r = Math.random();
-                    if (r < 0.2) {
-                        this.fighter.attack('LP');
+                    if (r < 0.25) {
+                        this.fighter.attack('P');
                         this.reactionTimer = 15;
-                    } else if (r < 0.3) {
-                        this.fighter.attack('closeMP');
-                        this.reactionTimer = 20;
                     } else if (r < 0.4) {
+                        this.fighter.attack('K');
+                        this.reactionTimer = 20;
+                    } else if (r < 0.5) {
                         this.fighter.attemptThrow();
                         this.reactionTimer = 30;
-                    } else if (r < 0.5) {
+                    } else if (r < 0.65) {
                         this.fighter.crouch();
-                        this.fighter.attack('crMK');
+                        this.fighter.attack('crK');
                         this.reactionTimer = 25;
-                    } else if (r < 0.6) {
+                    } else if (r < 0.75) {
                         // Dragon punch
                         this.fighter.inputBuffer.addDirection('6');
                         this.fighter.inputBuffer.addDirection('2');
@@ -2558,14 +3835,30 @@
                         this.reactionTimer = 50;
                     }
                 } else {
-                    // Mid range
-                    if (Math.random() < 0.3) {
-                        this.fighter.attack('MK');
+                    // Mid range - add more movement options
+                    const r = Math.random();
+                    if (r < 0.2) {  // 20% attack
+                        this.fighter.attack('K');
                         this.reactionTimer = 25;
-                    } else if (Math.random() < 0.1) {
+                    } else if (r < 0.3) {  // 10% crouch attack
                         this.fighter.crouch();
-                        this.fighter.attack('crHK');
+                        this.fighter.attack('crK');
                         this.reactionTimer = 35;
+                    } else if (r < 0.35) {  // 5% jump (rare)
+                        this.fighter.jump(Math.random() < 0.5 ? 1 : -1);
+                        this.reactionTimer = 40;
+                    } else {  // 65% walk to maintain optimal distance
+                        // Walk towards optimal fighting distance
+                        const optimalDistance = 100;
+                        if (distance > optimalDistance) {
+                            const direction = player.x > this.fighter.x ? 1 : -1;
+                            this.fighter.walk(direction);
+                        } else {
+                            // Walk away if too close
+                            const direction = player.x > this.fighter.x ? -1 : 1;
+                            this.fighter.walk(direction);
+                        }
+                        this.reactionTimer = 5;
                     }
                 }
                 
@@ -2576,61 +3869,74 @@
             }
         }
 
-        // Stage background
+        // Starbase construction site background
         function drawBackground() {
-            // Sky gradient
-            const skyGradient = ctx.createLinearGradient(0, 0, 0, GROUND_Y);
-            skyGradient.addColorStop(0, '#1e3c72');
-            skyGradient.addColorStop(0.5, '#2a5298');
-            skyGradient.addColorStop(1, '#7e8ba3');
-            ctx.fillStyle = skyGradient;
-            ctx.fillRect(0, 0, canvas.width, GROUND_Y);
-            
-            // Clouds
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-            const cloudOffset = (Date.now() * 0.01) % canvas.width;
-            for (let i = 0; i < 5; i++) {
-                const x = (i * 200 + cloudOffset) % (canvas.width + 100) - 50;
-                const y = 50 + i * 30;
-                ctx.beginPath();
-                ctx.arc(x, y, 30, 0, Math.PI * 2);
-                ctx.arc(x + 25, y, 35, 0, Math.PI * 2);
-                ctx.arc(x + 50, y, 30, 0, Math.PI * 2);
-                ctx.fill();
+            if (backgroundLoaded && backgroundImage.complete) {
+                // Draw the background image, scaling it to fit the canvas
+                ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
+            } else {
+                // Fallback: simple gradient if image hasn't loaded
+                const skyGradient = ctx.createLinearGradient(0, 0, 0, GROUND_Y);
+                skyGradient.addColorStop(0, '#0a1929');
+                skyGradient.addColorStop(0.5, '#1a2942');
+                skyGradient.addColorStop(1, '#243752');
+                ctx.fillStyle = skyGradient;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
             }
             
-            // Ground
-            const groundGradient = ctx.createLinearGradient(0, GROUND_Y, 0, canvas.height);
-            groundGradient.addColorStop(0, '#8B7355');
-            groundGradient.addColorStop(0.5, '#A0826D');
-            groundGradient.addColorStop(1, '#6B5637');
-            ctx.fillStyle = groundGradient;
+            // Ground/concrete overlay (to ensure characters have a clear ground)
+            ctx.fillStyle = 'rgba(42, 49, 56, 0.8)';
             ctx.fillRect(0, GROUND_Y, canvas.width, canvas.height - GROUND_Y);
             
-            // Ground texture
-            ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+            // Ground texture lines
+            ctx.strokeStyle = '#1f262b';
             ctx.lineWidth = 1;
-            for (let i = 0; i < canvas.width; i += 20) {
+            for (let i = 0; i < canvas.width; i += 30) {
                 ctx.beginPath();
                 ctx.moveTo(i, GROUND_Y);
-                ctx.lineTo(i - 10, canvas.height);
+                ctx.lineTo(i, canvas.height);
                 ctx.stroke();
             }
             
-            // Stage edge markers
-            ctx.fillStyle = '#444';
-            ctx.fillRect(40, GROUND_Y - 10, 10, 10);
-            ctx.fillRect(canvas.width - 50, GROUND_Y - 10, 10, 10);
+            // Stage boundaries
+            ctx.fillStyle = '#334455';
+            ctx.fillRect(0, GROUND_Y - 10, 40, 10);
+            ctx.fillRect(canvas.width - 40, GROUND_Y - 10, 40, 10);
         }
 
         // Initialize game
         const inputManager = new InputManager();
-        const player = new Fighter(250, true);
-        const aiPlayer = new Fighter(710, false);
+        const player = new Fighter(250, true, 'elon');
+        const aiPlayer = new Fighter(710, false, 'trump');
         const aiController = new AIController(aiPlayer);
         
         // Set player reference for gamepad special moves
         inputManager.setPlayer(player);
+        
+        // Load sprites for both characters
+        async function initializeSprites() {
+            try {
+                await Promise.all([
+                    spriteManager.loadCharacterSprites('elon'),
+                    spriteManager.loadCharacterSprites('trump')
+                ]);
+                console.log('[GAME] Sprites loaded successfully for both characters');
+            } catch (error) {
+                console.error('[GAME] Failed to load some sprites:', error);
+                // Game will still work with shape fallbacks
+            }
+        }
+        
+        // Start loading sprites and wait for them before starting the game
+        initializeSprites().then(() => {
+            console.log('[GAME] All sprites loaded, starting game loop');
+            // Start game
+            gameLoop();
+        }).catch(error => {
+            console.error('[GAME] Error loading sprites, starting with fallback:', error);
+            // Start game anyway with vector fallbacks
+            gameLoop();
+        });
         
         // Use InputManager for key states
         const keys = inputManager.getKeys();
@@ -2640,6 +3946,21 @@
             // Check all attacks
             [player, aiPlayer].forEach((attacker, i) => {
                 const defender = i === 0 ? aiPlayer : player;
+                
+                // Skip collision checks during throw animations
+                if (attacker.state === 'throwingOpponent' || defender.state === 'beingThrown') {
+                    return;
+                }
+                
+                // Debug throw hitboxes
+                if (attacker.isPlayer && attacker.currentMove === 'throw' && attacker.hitboxes.length > 0) {
+                    console.log('[THROW] Checking collisions:', {
+                        attackerHitboxes: attacker.hitboxes.length,
+                        defenderHurtboxes: defender.hurtboxes.length,
+                        defenderState: defender.state,
+                        defenderGrounded: defender.grounded
+                    });
+                }
                 
                 // Regular attacks
                 attacker.hitboxes.forEach(hitbox => {
@@ -2657,6 +3978,21 @@
                             height: hurtbox.height
                         };
                         
+                        // Debug throw collision
+                        if (hitbox.type === 'throw' && attacker.isPlayer) {
+                            const xOverlap = hit1.x < hurt2.x + hurt2.width && hit1.x + hit1.width > hurt2.x;
+                            const yOverlap = hit1.y < hurt2.y + hurt2.height && hit1.y + hit1.height > hurt2.y;
+                            console.log('[THROW] Collision check:', {
+                                hitbox: `x:${hit1.x}, y:${hit1.y}, w:${hit1.width}, h:${hit1.height}`,
+                                hurtbox: `x:${hurt2.x}, y:${hurt2.y}, w:${hurt2.width}, h:${hurt2.height}`,
+                                overlap: {
+                                    x: xOverlap,
+                                    y: yOverlap,
+                                    bothAxes: xOverlap && yOverlap
+                                }
+                            });
+                        }
+                        
                         if (hit1.x < hurt2.x + hurt2.width &&
                             hit1.x + hit1.width > hurt2.x &&
                             hit1.y < hurt2.y + hurt2.height &&
@@ -2664,6 +4000,20 @@
                             
                             // Hit confirmed
                             const moveData = FRAME_DATA[attacker.currentMove];
+                            
+                            // Skip if no move data (move was cleared)
+                            if (!moveData) {
+                                return;
+                            }
+                            
+                            // Debug for throws
+                            if (hitbox.type === 'throw' && attacker.isPlayer) {
+                                console.log('[THROW] HIT CONFIRMED! Checking canHit...', {
+                                    currentMoveHits: attacker.currentMoveHits,
+                                    moveData: moveData
+                                });
+                            }
+                            
                             const maxHits = moveData.hits || 1;
                             
                             // Check if we can hit again
@@ -2680,15 +4030,63 @@
                                 }
                             }
                             
+                            // More debug for throws
+                            if (hitbox.type === 'throw' && attacker.isPlayer) {
+                                console.log('[THROW] canHit result:', canHit);
+                            }
+                            
                             if (canHit) {
-                                if (hitbox.type === 'throw' && defender.throwTechWindow <= 0) {
-                                    // Successful throw
-                                    defender.beingThrown = true;
-                                    defender.knockdownFrames = 40;
-                                    defender.velocityY = -6;
-                                    defender.pushbackVelocity = -defender.facing * 8;
-                                    defender.takeDamage(moveData.damage, 0, 0, 0, true, attacker);
-                                } else if (hitbox.type !== 'throw') {
+                                if (hitbox.type === 'throw') {
+                                    // Debug all throw conditions
+                                    if (attacker.isPlayer) {
+                                        console.log('[THROW] Checking throw conditions:', {
+                                            beingThrown: defender.beingThrown,
+                                            grounded: defender.grounded,
+                                            state: defender.state,
+                                            knockdownFrames: defender.knockdownFrames,
+                                            canBeThrown: !defender.beingThrown && defender.grounded && 
+                                                defender.state !== 'knockdown' && defender.knockdownFrames <= 0 &&
+                                                defender.state !== 'attack'
+                                        });
+                                    }
+                                    
+                                    // Check if opponent can be thrown
+                                    if (!defender.beingThrown && defender.grounded && 
+                                        defender.state !== 'knockdown' && defender.knockdownFrames <= 0 &&
+                                        defender.state !== 'attack') {
+                                        
+                                        // First, clear any previous throw state
+                                        defender.beingThrown = false;
+                                        defender.throwAttacker = null;
+                                        defender.throwAnimationFrame = 0;
+                                        
+                                        // Successful throw - instant execution for simplicity
+                                        console.log('[THROW] SUCCESS! Throwing opponent');
+                                        defender.beingThrown = true;
+                                        defender.throwAttacker = attacker;
+                                        defender.throwAnimationFrame = 0;
+                                        defender.state = 'beingThrown';
+                                        defender.velocityX = 0;
+                                        defender.velocityY = 0;
+                                        
+                                        // Attacker enters throw state
+                                        attacker.state = 'throwingOpponent';
+                                        attacker.throwAnimationFrame = 0;
+                                        attacker.moveFrame = 0; // Reset move frame
+                                        
+                                        // Clear attack state and hitboxes to prevent further collisions
+                                        attacker.currentMove = null;
+                                        attacker.isThrowAttempt = false;
+                                        attacker.hitboxes = [];  // Clear all hitboxes immediately
+                                        
+                                        // Track successful throw hit
+                                        attacker.currentMoveHits++;
+                                        attacker.lastHitFrame = attacker.moveFrame;
+                                        
+                                        // Don't apply damage yet - wait for the slam
+                                    }
+                                    // Don't track hit here - let it fall through to avoid double-counting
+                                } else {
                                     // Normal hit
                                     defender.takeDamage(
                                         moveData.damage,
@@ -2698,16 +4096,16 @@
                                         moveData.knockdown,
                                         attacker
                                     );
+                                    
+                                    // Track normal hit
+                                    attacker.currentMoveHits++;
+                                    attacker.lastHitFrame = attacker.moveFrame;
+                                    attacker.lastHit = attacker.currentMove + attacker.moveFrame;
+                                    
+                                    // Build super meter for normal attacks
+                                    attacker.superMeter = Math.min(attacker.maxSuper, 
+                                        attacker.superMeter + moveData.damage * 0.5);
                                 }
-                                
-                                // Track the hit
-                                attacker.currentMoveHits++;
-                                attacker.lastHitFrame = attacker.moveFrame;
-                                attacker.lastHit = attacker.currentMove + attacker.moveFrame;
-                                
-                                // Build super meter
-                                attacker.superMeter = Math.min(attacker.maxSuper, 
-                                    attacker.superMeter + moveData.damage * 0.5);
                             }
                         }
                     });
@@ -2829,7 +4227,7 @@
                 // Check win conditions
                 if (player.health <= 0 || aiPlayer.health <= 0) {
                     window.gameOver = true;
-                    winner = player.health > 0 ? 'PLAYER 1' : 'CPU';
+                    winner = player.health > 0 ? 'ELON MUSK' : 'DONALD TRUMP';
                 }
             }
             
@@ -2848,9 +4246,80 @@
             // Draw after images
             afterImages.forEach(img => img.draw());
             
-            // Draw fighters
-            player.draw();
-            aiPlayer.draw();
+            // Draw fighters with proper depth sorting
+            const fighters = [player, aiPlayer].sort((a, b) => a.y - b.y);
+            
+            // Determine which fighter is Elon and which is Trump
+            const elonFighter = player.characterName === 'elon' ? player : aiPlayer;
+            const trumpFighter = player.characterName === 'trump' ? player : aiPlayer;
+            
+            // Dynamic depth switching based on active attacks
+            let drawOrder = [...fighters]; // Default to Y-sorted order
+            let impactFlashData = null; // Store impact flash info
+            
+            // Update depth switch timers
+            fighters.forEach(fighter => {
+                if (fighter.depthSwitchTimer > 0) {
+                    fighter.depthSwitchTimer--;
+                }
+            });
+            
+            // Check if any fighter is actively hitting
+            fighters.forEach(fighter => {
+                if (fighter.state === 'attack' && fighter.currentMove && fighter.hitboxes.length > 0) {
+                    const moveData = FRAME_DATA[fighter.currentMove];
+                    if (moveData && fighter.moveFrame >= moveData.startup && 
+                        fighter.moveFrame < moveData.startup + moveData.active) {
+                        
+                        // Check if making contact
+                        const opponent = fighter === player ? aiPlayer : player;
+                        const hitbox = fighter.hitboxes[0];
+                        const hitboxX = fighter.x + hitbox.x;
+                        const hitboxY = fighter.y + hitbox.y;
+                        
+                        // Check overlap with opponent's hurtbox
+                        const hitting = hitboxX < opponent.x + 60 && 
+                                      hitboxX + hitbox.width > opponent.x - 60 &&
+                                      hitboxY < opponent.y && 
+                                      hitboxY + hitbox.height > opponent.y - 298;
+                        
+                        if (hitting) {
+                            // Set depth switch timer (active frames + 7 extra frames)
+                            fighter.depthSwitchTimer = moveData.active + 7;
+                            
+                            // Store impact flash data for later
+                            if (moveData.impactPoint) {
+                                impactFlashData = {
+                                    x: fighter.x + (fighter.facing === 1 ? moveData.impactPoint.x : -moveData.impactPoint.x),
+                                    y: fighter.y + moveData.impactPoint.y
+                                };
+                            }
+                        }
+                    }
+                }
+                
+                // Apply depth switch if timer is active
+                if (fighter.depthSwitchTimer > 0) {
+                    const opponent = fighter === player ? aiPlayer : player;
+                    drawOrder = [opponent, fighter];
+                }
+            });
+            
+            // Draw fighters in determined order
+            drawOrder.forEach(fighter => fighter.draw(true));
+            
+            // Draw impact flash on top of everything
+            if (impactFlashData) {
+                ctx.save();
+                ctx.globalAlpha = 0.8;
+                ctx.fillStyle = '#ffffff';
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(impactFlashData.x, impactFlashData.y, 25, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
             
             // Draw particles
             particles.forEach(p => p.draw());
@@ -2924,8 +4393,7 @@
             requestAnimationFrame(gameLoop);
         }
         
-        // Start game
-        gameLoop();
+        // Game loop is now started after sprites load in initializeSprites()
     </script>
 </body>
 </html>
