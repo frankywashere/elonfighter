@@ -240,6 +240,14 @@
         // Enable image smoothing for better graphics
         ctx.imageSmoothingEnabled = false;
 
+        // Background image
+        const backgroundImage = new Image();
+        backgroundImage.src = 'ChatGPT Image Jul 31, 2025, 08_46_53 PM.png';
+        let backgroundLoaded = false;
+        backgroundImage.onload = () => {
+            backgroundLoaded = true;
+        };
+
         // Global effects
         let screenShake = 0;
         let hitPause = 0;
@@ -292,6 +300,7 @@
                             'hit': 'standing.png',
                             'knockdown': 'on-gound-knocked-out.png',
                             'beingThrown': 'thrown.png',
+                            'throwingOpponent': 'throwing-opponent.png',  // New throwing sprite
                             'dizzy': 'standing.png',  // Use standing for dizzy
                             'hitstun': 'standing.png'  // Use standing for hitstun
                         }
@@ -1143,7 +1152,7 @@
                     } else if (this.state === 'beingThrown') {
                         spriteState = 'beingThrown';
                     } else if (this.state === 'throwingOpponent') {
-                        spriteState = 'P';  // Use punch sprite for throwing
+                        spriteState = 'throwingOpponent';  // Use throwing opponent sprite
                     } else if (!this.grounded && this.state === 'attack') {
                         // Jumping attacks
                         if (this.currentMove === 'jP') {
@@ -3411,20 +3420,23 @@
                 
                 // Offensive patterns
                 if (distance > 200) {
-                    // Approach
-                    if (Math.random() < 0.3) {
+                    // Approach - heavily favor walking over jumping
+                    const r = Math.random();
+                    if (r < 0.05) {  // Only 5% chance to jump (was 30%)
                         this.fighter.jump(1);
                         this.reactionTimer = 40;
-                    } else if (Math.random() < 0.1) {
+                    } else if (r < 0.15) {  // 10% chance for fireball
                         // Fireball
                         this.fighter.inputBuffer.addDirection('2');
                         this.fighter.inputBuffer.addDirection('3');
                         this.fighter.inputBuffer.addDirection('6');
                         this.fighter.performSpecialMove('hadouken');
                         this.reactionTimer = 60;
-                    } else {
-                        this.fighter.walk(1);
-                        this.reactionTimer = 5;
+                    } else {  // 85% chance to walk forward
+                        // Walk towards player
+                        const direction = player.x > this.fighter.x ? 1 : -1;
+                        this.fighter.walk(direction);
+                        this.reactionTimer = 3;  // Shorter timer for smoother walking
                     }
                 } else if (distance < 70) {
                     // Close combat
@@ -3451,14 +3463,30 @@
                         this.reactionTimer = 50;
                     }
                 } else {
-                    // Mid range
-                    if (Math.random() < 0.3) {
+                    // Mid range - add more movement options
+                    const r = Math.random();
+                    if (r < 0.2) {  // 20% attack
                         this.fighter.attack('K');
                         this.reactionTimer = 25;
-                    } else if (Math.random() < 0.1) {
+                    } else if (r < 0.3) {  // 10% crouch attack
                         this.fighter.crouch();
                         this.fighter.attack('crK');
                         this.reactionTimer = 35;
+                    } else if (r < 0.35) {  // 5% jump (rare)
+                        this.fighter.jump(Math.random() < 0.5 ? 1 : -1);
+                        this.reactionTimer = 40;
+                    } else {  // 65% walk to maintain optimal distance
+                        // Walk towards optimal fighting distance
+                        const optimalDistance = 100;
+                        if (distance > optimalDistance) {
+                            const direction = player.x > this.fighter.x ? 1 : -1;
+                            this.fighter.walk(direction);
+                        } else {
+                            // Walk away if too close
+                            const direction = player.x > this.fighter.x ? -1 : 1;
+                            this.fighter.walk(direction);
+                        }
+                        this.reactionTimer = 5;
                     }
                 }
                 
@@ -3469,114 +3497,39 @@
             }
         }
 
-        // Futuristic corridor background
+        // Starbase construction site background
         function drawBackground() {
-            // Base dark background
-            ctx.fillStyle = '#0a0a0f';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            // Draw perspective lines for depth
-            const vanishingX = canvas.width / 2;
-            const vanishingY = GROUND_Y / 2;
-            
-            // Ceiling grid
-            ctx.strokeStyle = 'rgba(100, 100, 120, 0.3)';
-            ctx.lineWidth = 1;
-            for (let i = 0; i <= 20; i++) {
-                const y = (i / 20) * GROUND_Y;
-                ctx.beginPath();
-                ctx.moveTo(0, y);
-                ctx.lineTo(canvas.width, y);
-                ctx.stroke();
+            if (backgroundLoaded && backgroundImage.complete) {
+                // Draw the background image, scaling it to fit the canvas
+                ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
+            } else {
+                // Fallback: simple gradient if image hasn't loaded
+                const skyGradient = ctx.createLinearGradient(0, 0, 0, GROUND_Y);
+                skyGradient.addColorStop(0, '#0a1929');
+                skyGradient.addColorStop(0.5, '#1a2942');
+                skyGradient.addColorStop(1, '#243752');
+                ctx.fillStyle = skyGradient;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
             }
             
-            // Vertical perspective lines
-            for (let i = -10; i <= 10; i++) {
-                const x = vanishingX + i * 80;
-                ctx.beginPath();
-                ctx.moveTo(x, 0);
-                ctx.lineTo(vanishingX + i * 40, GROUND_Y);
-                ctx.stroke();
-            }
-            
-            // Glowing red corridor effect
-            const redGlow = ctx.createRadialGradient(vanishingX, vanishingY, 0, vanishingX, vanishingY, 400);
-            redGlow.addColorStop(0, 'rgba(255, 0, 0, 0.4)');
-            redGlow.addColorStop(0.5, 'rgba(200, 0, 0, 0.2)');
-            redGlow.addColorStop(1, 'rgba(100, 0, 0, 0)');
-            ctx.fillStyle = redGlow;
-            ctx.fillRect(0, 0, canvas.width, GROUND_Y);
-            
-            // Side pillars with red lights
-            const pillarWidth = 40;
-            for (let i = 0; i < 6; i++) {
-                const x = i * 160;
-                
-                // Left pillars
-                ctx.fillStyle = '#1a1a2e';
-                ctx.fillRect(x, 0, pillarWidth, GROUND_Y);
-                
-                // Red light strips on pillars
-                ctx.fillStyle = '#ff0040';
-                ctx.fillRect(x + pillarWidth/2 - 3, 100 + i * 30, 6, 60);
-                
-                // Light glow
-                const lightGlow = ctx.createRadialGradient(x + pillarWidth/2, 130 + i * 30, 0, x + pillarWidth/2, 130 + i * 30, 40);
-                lightGlow.addColorStop(0, 'rgba(255, 0, 64, 0.8)');
-                lightGlow.addColorStop(1, 'rgba(255, 0, 64, 0)');
-                ctx.fillStyle = lightGlow;
-                ctx.fillRect(x - 20, 90 + i * 30, pillarWidth + 40, 100);
-                
-                // Right pillars (mirror)
-                const rightX = canvas.width - x - pillarWidth;
-                ctx.fillStyle = '#1a1a2e';
-                ctx.fillRect(rightX, 0, pillarWidth, GROUND_Y);
-                ctx.fillStyle = '#ff0040';
-                ctx.fillRect(rightX + pillarWidth/2 - 3, 100 + i * 30, 6, 60);
-            }
-            
-            // Reflective floor
-            const floorGradient = ctx.createLinearGradient(0, GROUND_Y, 0, canvas.height);
-            floorGradient.addColorStop(0, '#2a2a3e');
-            floorGradient.addColorStop(0.3, '#1f1f2e');
-            floorGradient.addColorStop(1, '#0a0a0f');
-            ctx.fillStyle = floorGradient;
+            // Ground/concrete overlay (to ensure characters have a clear ground)
+            ctx.fillStyle = 'rgba(42, 49, 56, 0.8)';
             ctx.fillRect(0, GROUND_Y, canvas.width, canvas.height - GROUND_Y);
             
-            // Floor reflections
-            ctx.save();
-            ctx.globalAlpha = 0.3;
-            ctx.scale(1, -0.5);
-            ctx.translate(0, -GROUND_Y * 2 - 80);
-            
-            // Reflect red lights
-            for (let i = 0; i < 6; i++) {
-                const x = i * 160;
-                ctx.fillStyle = '#ff0040';
-                ctx.fillRect(x + pillarWidth/2 - 3, 100 + i * 30, 6, 60);
-                ctx.fillRect(canvas.width - x - pillarWidth/2 - 3, 100 + i * 30, 6, 60);
-            }
-            ctx.restore();
-            
-            // Floor grid lines
-            ctx.strokeStyle = 'rgba(100, 100, 120, 0.2)';
+            // Ground texture lines
+            ctx.strokeStyle = '#1f262b';
             ctx.lineWidth = 1;
-            for (let i = 0; i < canvas.width; i += 40) {
+            for (let i = 0; i < canvas.width; i += 30) {
                 ctx.beginPath();
                 ctx.moveTo(i, GROUND_Y);
-                ctx.lineTo(i + 20, canvas.height);
+                ctx.lineTo(i, canvas.height);
                 ctx.stroke();
             }
             
-            // Stage boundaries with tech panels
-            ctx.fillStyle = '#2a2a3e';
-            ctx.fillRect(0, GROUND_Y - 20, 60, 20);
-            ctx.fillRect(canvas.width - 60, GROUND_Y - 20, 60, 20);
-            
-            // Tech details on boundaries
-            ctx.fillStyle = '#00ffff';
-            ctx.fillRect(10, GROUND_Y - 15, 30, 3);
-            ctx.fillRect(canvas.width - 40, GROUND_Y - 15, 30, 3);
+            // Stage boundaries
+            ctx.fillStyle = '#334455';
+            ctx.fillRect(0, GROUND_Y - 10, 40, 10);
+            ctx.fillRect(canvas.width - 40, GROUND_Y - 10, 40, 10);
         }
 
         // Initialize game
@@ -3602,8 +3555,16 @@
             }
         }
         
-        // Start loading sprites
-        initializeSprites();
+        // Start loading sprites and wait for them before starting the game
+        initializeSprites().then(() => {
+            console.log('[GAME] All sprites loaded, starting game loop');
+            // Start game
+            gameLoop();
+        }).catch(error => {
+            console.error('[GAME] Error loading sprites, starting with fallback:', error);
+            // Start game anyway with vector fallbacks
+            gameLoop();
+        });
         
         // Use InputManager for key states
         const keys = inputManager.getKeys();
@@ -3989,8 +3950,7 @@
             requestAnimationFrame(gameLoop);
         }
         
-        // Start game
-        gameLoop();
+        // Game loop is now started after sprites load in initializeSprites()
     </script>
 </body>
 </html>
