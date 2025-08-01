@@ -1122,6 +1122,13 @@
                 
                 // Depth switch tracking
                 this.depthSwitchTimer = 0;
+                this.depthSwitchProgress = 0; // 0 to 1 for smooth transitions
+                
+                // Sprite transition tracking
+                this.previousSprite = 'idle';
+                this.spriteTransitionTimer = 0;
+                this.spriteTransitionFrom = null;
+                this.spriteTransitionTo = null;
             }
 
             drawCharacterSprite(isAfterImage = false) {
@@ -1130,6 +1137,34 @@
                 // Breathing animation
                 if (!isAfterImage && this.state === 'idle') {
                     this.breathingOffset = Math.sin(this.animTimer * 0.05) * 2;
+                }
+                
+                // Apply depth switch smoothing effects
+                if (!isAfterImage && this.depthSwitchTimer > 0) {
+                    // Calculate progress (0 to 1 and back to 0)
+                    const totalFrames = 10; // Total animation frames
+                    const halfFrames = totalFrames / 2;
+                    if (this.depthSwitchTimer > halfFrames) {
+                        // Fading in
+                        this.depthSwitchProgress = 1 - ((this.depthSwitchTimer - halfFrames) / halfFrames);
+                    } else {
+                        // Fading out
+                        this.depthSwitchProgress = this.depthSwitchTimer / halfFrames;
+                    }
+                    
+                    // 1. Subtle opacity change
+                    const baseOpacity = 0.9;
+                    const maxOpacity = 1.0;
+                    ctx.globalAlpha = baseOpacity + (this.depthSwitchProgress * (maxOpacity - baseOpacity));
+                    
+                    // 2. Position interpolation (move slightly forward)
+                    const moveAmount = this.depthSwitchProgress * 5;
+                    ctx.translate(this.facing * moveAmount, 0);
+                    
+                    // 3. Motion blur effect
+                    if (this.depthSwitchProgress > 0.3) {
+                        ctx.filter = `blur(${this.depthSwitchProgress * 1}px)`;
+                    }
                 }
                 
                 // Apply rotation for throw animation only when being thrown
@@ -1271,6 +1306,27 @@
                         spriteState = 'idle';
                     }
                     
+                    // Detect sprite transitions for smoothing
+                    if (spriteState !== this.previousSprite && !isAfterImage) {
+                        // New sprite transition detected
+                        this.spriteTransitionFrom = this.previousSprite;
+                        this.spriteTransitionTo = spriteState;
+                        this.spriteTransitionTimer = 6; // 6 frames of transition
+                        this.previousSprite = spriteState;
+                    }
+                    
+                    // Apply sprite transition motion blur
+                    if (this.spriteTransitionTimer > 0 && !isAfterImage) {
+                        const blurAmount = (this.spriteTransitionTimer / 6) * 2;
+                        ctx.filter = `blur(${blurAmount}px)`;
+                        this.spriteTransitionTimer--;
+                        
+                        // Add motion trail for attacks
+                        if (this.state === 'attack') {
+                            ctx.globalAlpha = 0.7;
+                        }
+                    }
+                    
                     // Attempt to draw sprite
                     if (useSprite && spriteState) {
                         // console.log(`[SPRITE ATTEMPT] Character: ${this.characterName}, State: ${this.state}, SpriteState: ${spriteState}, CurrentMove: ${this.currentMove}`);
@@ -1299,6 +1355,10 @@
                                     ctx.fillText('★', starX - 12, starY);
                                 }
                             }
+                            
+                            // Reset filters before returning
+                            ctx.filter = 'none';
+                            ctx.globalAlpha = 1.0;
                             
                             ctx.restore();
                             return;
@@ -1346,6 +1406,10 @@
                         ctx.fillText('★', starX - 12, starY);
                     }
                 }
+                
+                // Reset any filters before restoring
+                ctx.filter = 'none';
+                ctx.globalAlpha = 1.0;
                 
                 ctx.restore();
             }
@@ -3295,26 +3359,7 @@
                     ctx.restore();
                 }
                 
-                // Draw impact effects for punches and kicks
-                if (this.hitboxes.length > 0 && this.moveFrame >= FRAME_DATA[this.currentMove].startup) {
-                    this.hitboxes.forEach(hitbox => {
-                        // Draw a subtle glow around the attacking limb
-                        ctx.save();
-                        ctx.globalAlpha = 0.3;
-                        ctx.fillStyle = this.isPlayer ? '#00ff00' : '#ff0000';
-                        ctx.shadowBlur = 20;
-                        ctx.shadowColor = this.isPlayer ? '#00ff00' : '#ff0000';
-                        
-                        const hitX = this.x + hitbox.x + hitbox.width / 2;
-                        const hitY = this.y + hitbox.y + hitbox.height / 2;
-                        
-                        ctx.beginPath();
-                        ctx.arc(hitX, hitY, hitbox.width / 2, 0, Math.PI * 2);
-                        ctx.fill();
-                        
-                        ctx.restore();
-                    });
-                }
+                // Remove the green/red glow effect - it was too distracting
             }
             
             getSpriteKey() {
@@ -3435,8 +3480,8 @@
                     { x: 100, y: -180, width: 70, height: 60 },  // Knee/thigh
                     { x: 130, y: -120, width: 60, height: 50 }   // Foot extension
                 ],
-                // Impact point - where the foot strikes
-                impactPoint: { x: 160, y: -120 }
+                // Impact point - where the foot strikes (same height as punch for high kick)
+                impactPoint: { x: 160, y: -230 }
             },
             
             // Crouching attacks
