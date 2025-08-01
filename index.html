@@ -1324,12 +1324,8 @@
                     // 3. Removed motion blur effect
                 }
                 
-                // Apply rotation for throw animation only when being thrown
-                if (this.rotation !== 0 && this.state === 'beingThrown') {
-                    ctx.translate(this.x, this.y - 50);
-                    ctx.rotate(this.rotation);
-                    ctx.translate(-this.x, -(this.y - 50));
-                } else if (this.rotation !== 0) {
+                // No rotation during throws - keep character upright
+                if (this.rotation !== 0) {
                     // Clean up any stuck rotation
                     this.rotation = 0;
                 }
@@ -2922,8 +2918,8 @@
                         // Store throw direction for launch
                         this.throwDirection = throwDirection;
                         
-                        // Gentle rotation - just one flip
-                        this.rotation = progress * Math.PI * 2;  // One graceful rotation
+                        // No rotation - keep character upright
+                        this.rotation = 0;
                     } else {
                         // Throw complete - launch the victim gracefully
                         console.log('[THROW] Launch phase!', {
