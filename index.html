@@ -458,7 +458,7 @@
                             'hit': 'hit.png',  // New hit sprite!
                             'knockdown': 'thrown.png',  // Using thrown as knockdown
                             'beingThrown': 'thrown.png',
-                            'throwingOpponent': 'punch2.png',  // Using punch2 for throw
+                            'throwingOpponent': 'throw.png',  // Using throw sprite
                             'dizzy': 'hit.png',  // Use hit sprite for dizzy
                             'hitstun': 'hit.png',  // Use hit sprite for hitstun
                             'hadouken': 'powermove-1.png',  // Flamethrower sprite
@@ -674,6 +674,13 @@
                     if (key === '1') {
                         aiAttackDisabled = !aiAttackDisabled;
                         console.log('[DEBUG] AI attacks:', aiAttackDisabled ? 'DISABLED' : 'ENABLED');
+                        
+                        // Reset AI state when disabling attacks to prevent stuck states
+                        if (aiAttackDisabled && ai.fighter.state === 'attack') {
+                            ai.fighter.state = 'idle';
+                            ai.fighter.currentMove = null;
+                            ai.fighter.moveFrame = 0;
+                        }
                     }
                     
                     // Toggle hitbox visualization with 'h' key
@@ -1373,6 +1380,8 @@
                             spriteState = 'jP';  // Use jump punch for shoryuken
                         } else if (this.currentMove === 'tatsumaki') {
                             spriteState = 'jK';  // Use jump kick for tatsumaki
+                        } else if (this.currentMove === 'throw') {
+                            spriteState = 'throwingOpponent';  // Use throwingOpponent sprite
                         } else if (this.currentMove) {
                             // Handle punch cycling for variety
                             if (this.currentMove === 'P' && this.characterName === 'elon') {
@@ -2405,12 +2414,15 @@
                 const veryClose = distance < 80;
                 const mediumRange = distance < 200;
                 
-                // More lenient blocking - if holding back and any threat exists
+                // Block when there's an actual threat
+                // Also check if opponent is in early attack frames (startup) where hitbox isn't active yet
+                const opponentInStartup = opponent.state === 'attack' && 
+                                        opponent.moveFrame < (FRAME_DATA[opponent.currentMove]?.startup || 10);
+                
                 this.blocking = holdingBack && !this.isDizzy && 
                     (hasActiveThreat || 
-                     hasIncomingProjectile || 
-                     (mediumRange && opponent.state === 'attack') ||
-                     veryClose);
+                     hasIncomingProjectile ||
+                     (mediumRange && opponentInStartup)); // Preemptive blocking for startup frames
                 
                 // Debug logging for player - log every frame to catch the stuck state
                 if (this.isPlayer) {
@@ -3681,7 +3693,8 @@
                             'jK': 'jump-kick',
                             'hadouken': 'hadouken',  // Maps to powermove-1.png for Elon
                             'shoryuken': 'punch',    // Use punch sprite for shoryuken
-                            'tatsumaki': 'kick-standing'  // Use kick sprite for tatsumaki
+                            'tatsumaki': 'kick-standing',  // Use kick sprite for tatsumaki
+                            'throw': 'throwingOpponent'  // Use throwingOpponent sprite
                         };
                         spriteState = moveSpriteMap[this.currentMove] || this.currentMove;
                     }
