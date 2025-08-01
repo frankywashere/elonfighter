@@ -1306,28 +1306,100 @@
                         spriteState = 'idle';
                     }
                     
-                    // Detect sprite transitions for smoothing
+                    // Detect sprite transitions for interpolation
                     if (spriteState !== this.previousSprite && !isAfterImage) {
-                        // New sprite transition detected
-                        this.spriteTransitionFrom = this.previousSprite;
-                        this.spriteTransitionTo = spriteState;
-                        this.spriteTransitionTimer = 6; // 6 frames of transition
+                        // Check if this is an attack transition we should interpolate
+                        const isAttackTransition = 
+                            (this.previousSprite === 'idle' && (spriteState === 'P' || spriteState === 'punch' || spriteState === 'punch2' || spriteState === 'K')) ||
+                            ((this.previousSprite === 'P' || this.previousSprite === 'punch' || this.previousSprite === 'punch2' || this.previousSprite === 'K') && spriteState === 'idle');
+                        
+                        if (isAttackTransition) {
+                            this.spriteTransitionFrom = this.previousSprite;
+                            this.spriteTransitionTo = spriteState;
+                            this.spriteTransitionTimer = 8; // 8 frames for smoother interpolation
+                        }
                         this.previousSprite = spriteState;
                     }
                     
-                    // Apply sprite transition motion blur
-                    if (this.spriteTransitionTimer > 0 && !isAfterImage) {
-                        const blurAmount = (this.spriteTransitionTimer / 6) * 2;
+                    // Handle frame interpolation for transitions
+                    if (this.spriteTransitionTimer > 0 && !isAfterImage && this.spriteTransitionFrom && this.spriteTransitionTo) {
+                        const totalFrames = 8;
+                        const progress = 1 - (this.spriteTransitionTimer / totalFrames);
+                        
+                        // Draw interpolated frames
+                        ctx.save();
+                        
+                        // Add motion blur
+                        const blurAmount = Math.sin(progress * Math.PI) * 1.5;
                         ctx.filter = `blur(${blurAmount}px)`;
+                        
+                        // Draw the "from" sprite with decreasing opacity
+                        ctx.globalAlpha = 1 - progress;
+                        spriteManager.drawSprite(
+                            ctx, 
+                            this.characterName, 
+                            this.spriteTransitionFrom, 
+                            this.x, 
+                            this.y,
+                            this.facing,
+                            0
+                        );
+                        
+                        // Draw the "to" sprite with increasing opacity
+                        ctx.globalAlpha = progress;
+                        
+                        // Add position offset for punches/kicks to simulate extension
+                        let offsetX = 0;
+                        if (this.spriteTransitionTo === 'P' || this.spriteTransitionTo === 'punch' || this.spriteTransitionTo === 'punch2') {
+                            offsetX = Math.sin(progress * Math.PI * 0.5) * 3 * this.facing;
+                        } else if (this.spriteTransitionTo === 'K') {
+                            offsetX = Math.sin(progress * Math.PI * 0.5) * 5 * this.facing;
+                        }
+                        
+                        spriteManager.drawSprite(
+                            ctx, 
+                            this.characterName, 
+                            this.spriteTransitionTo, 
+                            this.x + offsetX, 
+                            this.y,
+                            this.facing,
+                            0
+                        );
+                        
+                        ctx.restore();
+                        
                         this.spriteTransitionTimer--;
                         
-                        // Add motion trail for attacks
-                        if (this.state === 'attack') {
-                            ctx.globalAlpha = 0.7;
+                        // Skip normal sprite drawing during transition
+                        if (this.spriteTransitionTimer > 0) {
+                            // Reset filters
+                            ctx.filter = 'none';
+                            ctx.globalAlpha = 1.0;
+                            
+                            // Dizzy stars still need to be drawn
+                            if (this.isDizzy) {
+                                ctx.fillStyle = '#ffff00';
+                                ctx.font = 'bold 24px Arial';
+                                ctx.shadowBlur = 10;
+                                ctx.shadowColor = '#ffff00';
+                                for (let i = 0; i < 3; i++) {
+                                    const angle = (this.animTimer * 0.1) + (i * Math.PI * 2 / 3);
+                                    const starX = this.x + Math.cos(angle) * 30;
+                                    const starY = baseY - 120 + Math.sin(angle) * 10;
+                                    ctx.fillText('★', starX - 12, starY);
+                                }
+                            }
+                            
+                            // Reset filters before returning
+                            ctx.filter = 'none';
+                            ctx.globalAlpha = 1.0;
+                            
+                            ctx.restore();
+                            return;
                         }
                     }
                     
-                    // Attempt to draw sprite
+                    // Continue with normal sprite drawing if not transitioning
                     if (useSprite && spriteState) {
                         // console.log(`[SPRITE ATTEMPT] Character: ${this.characterName}, State: ${this.state}, SpriteState: ${spriteState}, CurrentMove: ${this.currentMove}`);
                         const spriteDrawn = spriteManager.drawSprite(
