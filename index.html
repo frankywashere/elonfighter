@@ -40,8 +40,6 @@
             border: 4px solid #222;
             box-shadow: 0 0 40px rgba(0,0,0,0.8), inset 0 0 20px rgba(0,0,0,0.5);
             background: #000;
-            max-width: 100%;
-            max-height: 100%;
             display: block;
         }
         .controls {
@@ -224,11 +222,7 @@
                 height: 100vh;
             }
             
-            canvas {
-                width: 100% !important;
-                height: 100% !important;
-                object-fit: contain;
-            }
+            /* Canvas sizing is handled by JavaScript resizeCanvas function */
         }
     </style>
 </head>
@@ -279,28 +273,23 @@
                 parseInt(getComputedStyle(document.body).paddingBottom) - 
                 borderWidth;
             
-            // For landscape mode, fill the entire screen instead of maintaining aspect ratio
-            const isLandscape = window.innerWidth > window.innerHeight;
+            // Calculate scale to fit screen while maintaining aspect ratio
+            const scaleX = availableWidth / BASE_WIDTH;
+            const scaleY = availableHeight / BASE_HEIGHT;
+            gameScale = Math.min(scaleX, scaleY) * 0.95; // 95% to ensure some margin
             
-            let finalWidth, finalHeight;
+            // Calculate final dimensions maintaining aspect ratio
+            const finalWidth = BASE_WIDTH * gameScale;
+            const finalHeight = BASE_HEIGHT * gameScale;
             
-            if (isLandscape) {
-                // In landscape, use full available space
-                finalWidth = availableWidth * 0.98; // 98% to prevent edge clipping
-                finalHeight = availableHeight * 0.98;
-                
-                // Calculate scale based on the dimensions
-                const scaleX = finalWidth / BASE_WIDTH;
-                const scaleY = finalHeight / BASE_HEIGHT;
-                gameScale = Math.max(scaleX, scaleY); // Use max to fill screen
-            } else {
-                // In portrait, maintain aspect ratio (fallback for unsupported orientation)
-                const scaleX = availableWidth / BASE_WIDTH;
-                const scaleY = availableHeight / BASE_HEIGHT;
-                gameScale = Math.min(scaleX, scaleY) * 0.95;
-                finalWidth = BASE_WIDTH * gameScale;
-                finalHeight = BASE_HEIGHT * gameScale;
-            }
+            // Debug logging
+            console.log('Canvas Resize Debug:', {
+                windowSize: `${window.innerWidth}x${window.innerHeight}`,
+                availableSize: `${availableWidth}x${availableHeight}`,
+                baseSize: `${BASE_WIDTH}x${BASE_HEIGHT}`,
+                scaleX, scaleY, gameScale,
+                finalSize: `${finalWidth}x${finalHeight}`
+            });
             
             // Apply scale
             canvas.width = BASE_WIDTH;
