@@ -279,16 +279,34 @@
                 parseInt(getComputedStyle(document.body).paddingBottom) - 
                 borderWidth;
             
-            // Calculate scale to fit screen while maintaining aspect ratio
-            const scaleX = availableWidth / BASE_WIDTH;
-            const scaleY = availableHeight / BASE_HEIGHT;
-            gameScale = Math.min(scaleX, scaleY) * 0.95; // 95% to ensure some margin
+            // For landscape mode, fill the entire screen instead of maintaining aspect ratio
+            const isLandscape = window.innerWidth > window.innerHeight;
+            
+            let finalWidth, finalHeight;
+            
+            if (isLandscape) {
+                // In landscape, use full available space
+                finalWidth = availableWidth * 0.98; // 98% to prevent edge clipping
+                finalHeight = availableHeight * 0.98;
+                
+                // Calculate scale based on the dimensions
+                const scaleX = finalWidth / BASE_WIDTH;
+                const scaleY = finalHeight / BASE_HEIGHT;
+                gameScale = Math.max(scaleX, scaleY); // Use max to fill screen
+            } else {
+                // In portrait, maintain aspect ratio (fallback for unsupported orientation)
+                const scaleX = availableWidth / BASE_WIDTH;
+                const scaleY = availableHeight / BASE_HEIGHT;
+                gameScale = Math.min(scaleX, scaleY) * 0.95;
+                finalWidth = BASE_WIDTH * gameScale;
+                finalHeight = BASE_HEIGHT * gameScale;
+            }
             
             // Apply scale
             canvas.width = BASE_WIDTH;
             canvas.height = BASE_HEIGHT;
-            canvas.style.width = (BASE_WIDTH * gameScale) + 'px';
-            canvas.style.height = (BASE_HEIGHT * gameScale) + 'px';
+            canvas.style.width = finalWidth + 'px';
+            canvas.style.height = finalHeight + 'px';
             
             // Center the canvas
             const gameContainer = document.getElementById('gameContainer');
