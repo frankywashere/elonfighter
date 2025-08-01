@@ -295,6 +295,28 @@
                             'dizzy': 'standing.png',  // Use standing for dizzy
                             'hitstun': 'standing.png'  // Use standing for hitstun
                         }
+                    },
+                    'trump': {
+                        basePath: 'trump1/',
+                        sprites: {
+                            'idle': 'standing.png',
+                            'walk': 'walking-forward.png',  // Use the new walking sprite
+                            'walk2': 'standing.png',  // Alternate frame for walk animation
+                            'crouch': 'crouch.png',
+                            'jump': 'jump.png',
+                            'P': 'punch-standing.png',  // Standing punch
+                            'K': 'kick-standing.png',   // Standing kick
+                            'crP': 'crouch-punch.png', // Crouch punch
+                            'crK': 'crouch-kick.png',  // Crouch kick
+                            'jP': 'jump.png',    // Use jump sprite for jump punch
+                            'jK': 'jump-kick.png',     // Jump kick
+                            'block': 'crouch-block.png',
+                            'hit': 'standing.png',
+                            'knockdown': 'thrown.png',  // Use thrown sprite for knockdown
+                            'beingThrown': 'thrown.png',
+                            'dizzy': 'standing.png',  // Use standing for dizzy
+                            'hitstun': 'standing.png'  // Use standing for hitstun
+                        }
                     }
                 };
                 
@@ -991,14 +1013,14 @@
 
         // Enhanced Fighter class
         class Fighter {
-            constructor(x, isPlayer) {
+            constructor(x, isPlayer, characterName = 'elon') {
                 this.x = x;
                 this.y = GROUND_Y;
                 this.isPlayer = isPlayer;
                 this.facing = isPlayer ? 1 : -1;
                 
                 // Character identity for sprites
-                this.characterName = 'elon';  // Both player and AI use sprites
+                this.characterName = characterName;
                 
                 // Physics
                 this.velocityX = 0;
@@ -1147,7 +1169,28 @@
                             spriteState = 'idle';
                         }
                     } else if (this.state === 'walk') {
-                        spriteState = 'walk';
+                        // Animated walk cycle for Trump character
+                        if (this.characterName === 'trump') {
+                            // Create a smooth walk cycle
+                            // Use a slower cycle for more natural walking
+                            const walkCycleFrame = Math.floor(this.animTimer / 8) % 4;
+                            
+                            // Create a pattern: walk -> walk -> walk2 -> walk2
+                            // This gives a nice rhythm with the step emphasized
+                            if (walkCycleFrame < 2) {
+                                spriteState = 'walk';  // Walking forward sprite
+                            } else {
+                                spriteState = 'walk2';  // Standing sprite
+                            }
+                            
+                            // Add a slight vertical bob for more natural movement
+                            if (!isAfterImage) {
+                                const bobAmount = Math.sin(this.animTimer * 0.15) * 2;
+                                this.breathingOffset = bobAmount;
+                            }
+                        } else {
+                            spriteState = 'walk';
+                        }
                     } else if (this.state === 'crouch' || this.crouching) {
                         spriteState = 'crouch';
                     } else if (this.blocking) {
@@ -2701,7 +2744,17 @@
                     console.log('[PLAYER] Bounds correction:', {from: oldBoundedX, to: this.x});
                 }
                 
-                // Facing is now updated in handleInput for better cross-up handling
+                // Update facing for auto-face (for both player and AI)
+                const opponent = this.isPlayer ? aiPlayer : player;
+                if (opponent && !this.knockdownFrames && this.state !== 'beingThrown' && this.state !== 'throwingOpponent') {
+                    const oldFacing = this.facing;
+                    this.facing = this.x < opponent.x ? 1 : -1;
+                    
+                    // If facing changed (cross-up), log it
+                    if (oldFacing !== this.facing) {
+                        console.log(`[${this.isPlayer ? 'PLAYER' : 'AI'}] Facing changed from ${oldFacing} to ${this.facing}`);
+                    }
+                }
                 
                 // Update hitboxes
                 this.updateHitboxes();
@@ -3020,7 +3073,7 @@
                 ctx.font = 'bold 20px Arial';
                 ctx.shadowColor = this.isPlayer ? '#00ff00' : '#ff0000';
                 ctx.shadowBlur = 10;
-                ctx.fillText(this.isPlayer ? 'ELON MUSK' : 'CPU', x + 5, y - 8);
+                ctx.fillText(this.isPlayer ? 'ELON MUSK' : 'DONALD TRUMP', x + 5, y - 8);
                 ctx.shadowBlur = 0;
                 
                 // Stun gauge
@@ -3528,18 +3581,21 @@
 
         // Initialize game
         const inputManager = new InputManager();
-        const player = new Fighter(250, true);
-        const aiPlayer = new Fighter(710, false);
+        const player = new Fighter(250, true, 'elon');
+        const aiPlayer = new Fighter(710, false, 'trump');
         const aiController = new AIController(aiPlayer);
         
         // Set player reference for gamepad special moves
         inputManager.setPlayer(player);
         
-        // Load sprites for player character
+        // Load sprites for both characters
         async function initializeSprites() {
             try {
-                await spriteManager.loadCharacterSprites('elon');
-                console.log('[GAME] Sprites loaded successfully');
+                await Promise.all([
+                    spriteManager.loadCharacterSprites('elon'),
+                    spriteManager.loadCharacterSprites('trump')
+                ]);
+                console.log('[GAME] Sprites loaded successfully for both characters');
             } catch (error) {
                 console.error('[GAME] Failed to load some sprites:', error);
                 // Game will still work with shape fallbacks
@@ -3838,7 +3894,7 @@
                 // Check win conditions
                 if (player.health <= 0 || aiPlayer.health <= 0) {
                     window.gameOver = true;
-                    winner = player.health > 0 ? 'ELON MUSK' : 'CPU';
+                    winner = player.health > 0 ? 'ELON MUSK' : 'DONALD TRUMP';
                 }
             }
             
