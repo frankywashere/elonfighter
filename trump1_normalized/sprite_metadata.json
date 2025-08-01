@@ -1,0 +1,112 @@
+{
+  "crouch-punch": {
+    "original_width": 533,
+    "original_height": 497,
+    "crop_x": 68,
+    "crop_y": 25,
+    "crop_width": 446,
+    "crop_height": 422,
+    "center_offset_x": 24.5,
+    "center_offset_y": -50.0
+  },
+  "jump": {
+    "original_width": 385,
+    "original_height": 704,
+    "crop_x": 30,
+    "crop_y": 11,
+    "crop_width": 335,
+    "crop_height": 677,
+    "center_offset_x": 5.0,
+    "center_offset_y": -16.0
+  },
+  "thrown": {
+    "original_width": 789,
+    "original_height": 563,
+    "crop_x": 56,
+    "crop_y": 13,
+    "crop_width": 707,
+    "crop_height": 532,
+    "center_offset_x": 15.0,
+    "center_offset_y": -18.0
+  },
+  "crouch-block": {
+    "original_width": 379,
+    "original_height": 491,
+    "crop_x": 51,
+    "crop_y": 17,
+    "crop_width": 287,
+    "crop_height": 428,
+    "center_offset_x": 5.0,
+    "center_offset_y": -46.0
+  },
+  "standing": {
+    "original_width": 502,
+    "original_height": 636,
+    "crop_x": 58,
+    "crop_y": 22,
+    "crop_width": 390,
+    "crop_height": 569,
+    "center_offset_x": 2.0,
+    "center_offset_y": -45.0
+  },
+  "jump-kick": {
+    "original_width": 760,
+    "original_height": 485,
+    "crop_x": 57,
+    "crop_y": 39,
+    "crop_width": 600,
+    "crop_height": 418,
+    "center_offset_x": -23.0,
+    "center_offset_y": -28.0
+  },
+  "kick-standing": {
+    "original_width": 665,
+    "original_height": 637,
+    "crop_x": 47,
+    "crop_y": 58,
+    "crop_width": 606,
+    "crop_height": 539,
+    "center_offset_x": 17.5,
+    "center_offset_y": -40.0
+  },
+  "crouch": {
+    "original_width": 369,
+    "original_height": 468,
+    "crop_x": 38,
+    "crop_y": 24,
+    "crop_width": 282,
+    "crop_height": 431,
+    "center_offset_x": -5.5,
+    "center_offset_y": -13.0
+  },
+  "walking-forward": {
+    "original_width": 400,
+    "original_height": 600,
+    "crop_x": 45,
+    "crop_y": 5,
+    "crop_width": 314,
+    "crop_height": 580,
+    "center_offset_x": 2.0,
+    "center_offset_y": -15.0
+  },
+  "crouch-kick": {
+    "original_width": 646,
+    "original_height": 460,
+    "crop_x": 27,
+    "crop_y": 23,
+    "crop_width": 593,
+    "crop_height": 425,
+    "center_offset_x": 0.5,
+    "center_offset_y": -12.0
+  },
+  "punch-standing": {
+    "original_width": 595,
+    "original_height": 668,
+    "crop_x": 87,
+    "crop_y": 58,
+    "crop_width": 502,
+    "crop_height": 572,
+    "center_offset_x": 40.5,
+    "center_offset_y": -38.0
+  }
+}
