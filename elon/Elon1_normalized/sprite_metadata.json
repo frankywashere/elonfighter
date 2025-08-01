@@ -1,0 +1,142 @@
+{
+  "walking2": {
+    "original_width": 600,
+    "original_height": 900,
+    "crop_x": 139,
+    "crop_y": 19,
+    "crop_width": 383,
+    "crop_height": 879,
+    "center_offset_x": 30.5,
+    "center_offset_y": -2.0
+  },
+  "walking3": {
+    "original_width": 600,
+    "original_height": 900,
+    "crop_x": 17,
+    "crop_y": 13,
+    "crop_width": 528,
+    "crop_height": 880,
+    "center_offset_x": -19.0,
+    "center_offset_y": -7.0
+  },
+  "walking1": {
+    "original_width": 600,
+    "original_height": 900,
+    "crop_x": 23,
+    "crop_y": 21,
+    "crop_width": 527,
+    "crop_height": 861,
+    "center_offset_x": -13.5,
+    "center_offset_y": -18.0
+  },
+  "jump-elon": {
+    "original_width": 621,
+    "original_height": 930,
+    "crop_x": 85,
+    "crop_y": 63,
+    "crop_width": 479,
+    "crop_height": 679,
+    "center_offset_x": 14.0,
+    "center_offset_y": -188.0
+  },
+  "thrown": {
+    "original_width": 1408,
+    "original_height": 792,
+    "crop_x": 266,
+    "crop_y": 79,
+    "crop_width": 797,
+    "crop_height": 649,
+    "center_offset_x": -39.5,
+    "center_offset_y": -64.0
+  },
+  "standing": {
+    "original_width": 1408,
+    "original_height": 792,
+    "crop_x": 370,
+    "crop_y": 47,
+    "crop_width": 606,
+    "crop_height": 728,
+    "center_offset_x": -31.0,
+    "center_offset_y": -17.0
+  },
+  "jump-kick": {
+    "original_width": 1050,
+    "original_height": 700,
+    "crop_x": 1,
+    "crop_y": 41,
+    "crop_width": 629,
+    "crop_height": 578,
+    "center_offset_x": -209.5,
+    "center_offset_y": -81.0
+  },
+  "jumppunch-elon": {
+    "original_width": 805,
+    "original_height": 783,
+    "crop_x": 75,
+    "crop_y": 79,
+    "crop_width": 710,
+    "crop_height": 607,
+    "center_offset_x": 27.5,
+    "center_offset_y": -97.0
+  },
+  "block": {
+    "original_width": 638,
+    "original_height": 860,
+    "crop_x": 5,
+    "crop_y": 34,
+    "crop_width": 604,
+    "crop_height": 824,
+    "center_offset_x": -12.0,
+    "center_offset_y": -2.0
+  },
+  "hit": {
+    "original_width": 650,
+    "original_height": 650,
+    "crop_x": 106,
+    "crop_y": 96,
+    "crop_width": 414,
+    "crop_height": 522,
+    "center_offset_x": -12.0,
+    "center_offset_y": -32.0
+  },
+  "crouch": {
+    "original_width": 1536,
+    "original_height": 1024,
+    "crop_x": 480,
+    "crop_y": 191,
+    "crop_width": 521,
+    "crop_height": 795,
+    "center_offset_x": -27.5,
+    "center_offset_y": -38.0
+  },
+  "punch": {
+    "original_width": 561,
+    "original_height": 609,
+    "crop_x": 59,
+    "crop_y": 18,
+    "crop_width": 470,
+    "crop_height": 584,
+    "center_offset_x": 13.5,
+    "center_offset_y": -7.0
+  },
+  "punch2": {
+    "original_width": 600,
+    "original_height": 900,
+    "crop_x": 17,
+    "crop_y": 84,
+    "crop_width": 551,
+    "crop_height": 770,
+    "center_offset_x": -7.5,
+    "center_offset_y": -46.0
+  },
+  "kick-elon": {
+    "original_width": 757,
+    "original_height": 826,
+    "crop_x": 88,
+    "crop_y": 89,
+    "crop_width": 627,
+    "crop_height": 699,
+    "center_offset_x": 23.0,
+    "center_offset_y": -38.0
+  }
+}

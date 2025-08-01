@@ -1,0 +1,86 @@
+{
+  "crouch-punch": {
+    "original_size": "533x497",
+    "crop_size": "446x422",
+    "final_size": "538x509",
+    "scale_factor": 1.21,
+    "canvas_size": "1092x873"
+  },
+  "jump": {
+    "original_size": "385x704",
+    "crop_size": "335x677",
+    "final_size": "324x655",
+    "scale_factor": 0.97,
+    "canvas_size": "1092x873"
+  },
+  "thrown": {
+    "original_size": "789x563",
+    "crop_size": "707x532",
+    "final_size": "677x509",
+    "scale_factor": 0.96,
+    "canvas_size": "1092x873"
+  },
+  "crouch-block": {
+    "original_size": "379x491",
+    "crop_size": "287x428",
+    "final_size": "341x509",
+    "scale_factor": 1.19,
+    "canvas_size": "1092x873"
+  },
+  "standing": {
+    "original_size": "502x636",
+    "crop_size": "390x569",
+    "final_size": "498x728",
+    "scale_factor": 1.28,
+    "canvas_size": "1092x873"
+  },
+  "jump-kick": {
+    "original_size": "760x485",
+    "crop_size": "600x418",
+    "final_size": "940x655",
+    "scale_factor": 1.57,
+    "canvas_size": "1092x873"
+  },
+  "kick-standing": {
+    "original_size": "665x637",
+    "crop_size": "606x539",
+    "final_size": "818x728",
+    "scale_factor": 1.35,
+    "canvas_size": "1092x873"
+  },
+  "hit": {
+    "original_size": "1024x1024",
+    "crop_size": "514x913",
+    "final_size": "409x728",
+    "scale_factor": 0.8,
+    "canvas_size": "1092x873"
+  },
+  "crouch": {
+    "original_size": "369x468",
+    "crop_size": "282x431",
+    "final_size": "333x509",
+    "scale_factor": 1.18,
+    "canvas_size": "1092x873"
+  },
+  "walking-forward": {
+    "original_size": "400x600",
+    "crop_size": "314x580",
+    "final_size": "394x728",
+    "scale_factor": 1.26,
+    "canvas_size": "1092x873"
+  },
+  "crouch-kick": {
+    "original_size": "646x460",
+    "crop_size": "593x425",
+    "final_size": "711x509",
+    "scale_factor": 1.2,
+    "canvas_size": "1092x873"
+  },
+  "punch-standing": {
+    "original_size": "595x668",
+    "crop_size": "502x572",
+    "final_size": "638x728",
+    "scale_factor": 1.27,
+    "canvas_size": "1092x873"
+  }
+}
