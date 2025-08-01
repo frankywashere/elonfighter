@@ -212,6 +212,35 @@
             right: 50px; /* Moved closer to center from 20px */
         }
         
+        /* Mobile Restart Button */
+        .mobile-restart-button {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10001;
+            pointer-events: auto;
+        }
+
+        .restart-btn {
+            background-color: #ff4444;
+            color: white;
+            border: none;
+            padding: 20px 40px;
+            font-size: 24px;
+            font-family: 'Press Start 2P', monospace;
+            cursor: pointer;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            text-transform: uppercase;
+        }
+
+        .restart-btn:active {
+            transform: scale(0.95);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        
         @media (max-width: 768px) {
             .controls {
                 display: none;
@@ -276,6 +305,11 @@
             <div class="action-buttons">
                 <div class="touch-button action-button btn-punch" data-key="u">PUNCH</div>
                 <div class="touch-button action-button btn-kick" data-key="j">KICK</div>
+            </div>
+            
+            <!-- Restart Button (shown only when game is over) -->
+            <div class="mobile-restart-button" id="mobileRestartButton">
+                <button class="restart-btn">RESTART</button>
             </div>
         </div>
     </div>
@@ -855,6 +889,14 @@
                 mobileControls.addEventListener('touchend', handleTouchEnd, {passive: false});
                 mobileControls.addEventListener('touchmove', handleTouchMove, {passive: false});
                 mobileControls.addEventListener('touchcancel', handleTouchEnd, {passive: false});
+                
+                // Add restart button handler
+                const restartBtn = document.querySelector('.restart-btn');
+                if (restartBtn) {
+                    restartBtn.addEventListener('click', () => {
+                        location.reload();
+                    });
+                }
             }
             
             setupGamepad() {
@@ -4961,6 +5003,11 @@
                 if (player.health <= 0 || aiPlayer.health <= 0) {
                     window.gameOver = true;
                     winner = player.health > 0 ? 'ELON MUSK' : 'DONALD TRUMP';
+                    
+                    // Show mobile restart button if on mobile
+                    if (inputManager.isMobile) {
+                        document.getElementById('mobileRestartButton').style.display = 'block';
+                    }
                 }
             }
             

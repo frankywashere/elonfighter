@@ -69,6 +69,13 @@
     "scale_factor": 1.26,
     "canvas_size": "1092x873"
   },
+  "cash": {
+    "original_size": "100x100",
+    "crop_size": "79x56",
+    "final_size": "1027x728",
+    "scale_factor": 13.0,
+    "canvas_size": "1092x873"
+  },
   "crouch-kick": {
     "original_size": "646x460",
     "crop_size": "593x425",

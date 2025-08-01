@@ -48,6 +48,13 @@
     "scale_factor": 0.43,
     "canvas_size": "1092x873"
   },
+  "throw": {
+    "original_size": "1408x792",
+    "crop_size": "944x697",
+    "final_size": "985x728",
+    "scale_factor": 1.04,
+    "canvas_size": "1092x873"
+  },
   "standing": {
     "original_size": "1408x792",
     "crop_size": "606x728",
