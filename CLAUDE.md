@@ -4,7 +4,7 @@
 This is a Street Fighter II-style fighting game featuring Elon Musk and Donald Trump as playable characters. The game is built using HTML5 Canvas and vanilla JavaScript.
 
 ## Main Game File
-- **fighter_enhanced.html** - The current active game file (NOT fighter.html)
+- **index.html** - The main game file (formerly fighter_enhanced.html)
 - Uses HTML5 Canvas for rendering
 - Includes mobile touch controls
 - Features particle effects and advanced fighting mechanics
@@ -41,7 +41,7 @@ This is a Street Fighter II-style fighting game featuring Elon Musk and Donald T
 - When adding new sprites:
   1. Add to original folder (e.g., `elon/Elon1/`)
   2. Run normalization script
-  3. Update sprite mappings in fighter_enhanced.html
+  3. Update sprite mappings in index.html
 
 ## Game Controls
 
@@ -108,8 +108,8 @@ Sprites are loaded via `SpriteManager` class with mappings defined in `spriteMap
 ## Project Structure
 ```
 elon game test/
-├── fighter_enhanced.html (main game)
-├── fighter.html (old version)
+├── index.html (main game)
+├── fighter.html (old version - can be removed)
 ├── normalize_sprites_v3.py (sprite processor)
 ├── elon/
 │   ├── Elon1/ (original sprites)
@@ -120,7 +120,7 @@ elon game test/
 ```
 
 ## Notes for Future Sessions
-- Always use fighter_enhanced.html, not fighter.html
+- The main game file is now index.html (renamed from fighter_enhanced.html)
 - Run sprite normalization after adding new sprites
 - Check sprite mappings in HTML when adding new animations
 - Flamethrower uses multi-hit collision with cooldown between hits

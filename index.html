@@ -2,9 +2,11 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, minimal-ui">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="format-detection" content="telephone=no">
     <title>Street Fighter II - Enhanced Graphics</title>
     <style>
         body {
@@ -18,11 +20,17 @@
             font-family: 'Courier New', monospace;
             overflow: hidden;
             /* Support for Safari safe areas */
-            padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+            padding-top: env(safe-area-inset-top);
+            padding-right: env(safe-area-inset-right);
+            padding-bottom: env(safe-area-inset-bottom);
+            padding-left: env(safe-area-inset-left);
             /* Fullscreen support */
             position: fixed;
             width: 100%;
             height: 100%;
+            /* Prevent bouncing on iOS */
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior: none;
         }
         #gameContainer {
             position: relative;
@@ -32,20 +40,30 @@
             border: 4px solid #222;
             box-shadow: 0 0 40px rgba(0,0,0,0.8), inset 0 0 20px rgba(0,0,0,0.5);
             background: #000;
+            max-width: 100%;
+            max-height: 100%;
+            display: block;
         }
         .controls {
-            position: absolute;
-            bottom: -50px;
-            left: 50%;
-            transform: translateX(-50%);
-            color: #fff;
-            text-align: center;
-            font-size: 11px;
-            background: linear-gradient(to bottom, rgba(0,0,0,0.9), rgba(0,0,0,0.7));
-            padding: 10px 20px;
-            border-radius: 10px;
-            border: 1px solid #444;
-            text-shadow: 2px 2px 4px #000;
+            display: none; /* Hide keyboard controls on mobile */
+        }
+        
+        @media (min-width: 769px) {
+            .controls {
+                display: block;
+                position: absolute;
+                bottom: -50px;
+                left: 50%;
+                transform: translateX(-50%);
+                color: #fff;
+                text-align: center;
+                font-size: 11px;
+                background: linear-gradient(to bottom, rgba(0,0,0,0.9), rgba(0,0,0,0.7));
+                padding: 10px 20px;
+                border-radius: 10px;
+                border: 1px solid #444;
+                text-shadow: 2px 2px 4px #000;
+            }
         }
         .combo-display {
             position: absolute;
@@ -242,11 +260,60 @@
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        canvas.width = 960;
-        canvas.height = 540;
-
-        // Enable image smoothing for better graphics
-        ctx.imageSmoothingEnabled = false;
+        
+        // Base game dimensions
+        const BASE_WIDTH = 960;
+        const BASE_HEIGHT = 540;
+        let gameScale = 1;
+        
+        // Responsive canvas sizing
+        function resizeCanvas() {
+            // Get available space accounting for safe areas and canvas border
+            const borderWidth = 8; // 4px border on each side
+            const availableWidth = window.innerWidth - 
+                parseInt(getComputedStyle(document.body).paddingLeft) - 
+                parseInt(getComputedStyle(document.body).paddingRight) - 
+                borderWidth;
+            const availableHeight = window.innerHeight - 
+                parseInt(getComputedStyle(document.body).paddingTop) - 
+                parseInt(getComputedStyle(document.body).paddingBottom) - 
+                borderWidth;
+            
+            // Calculate scale to fit screen while maintaining aspect ratio
+            const scaleX = availableWidth / BASE_WIDTH;
+            const scaleY = availableHeight / BASE_HEIGHT;
+            gameScale = Math.min(scaleX, scaleY) * 0.95; // 95% to ensure some margin
+            
+            // Apply scale
+            canvas.width = BASE_WIDTH;
+            canvas.height = BASE_HEIGHT;
+            canvas.style.width = (BASE_WIDTH * gameScale) + 'px';
+            canvas.style.height = (BASE_HEIGHT * gameScale) + 'px';
+            
+            // Center the canvas
+            const gameContainer = document.getElementById('gameContainer');
+            gameContainer.style.position = 'absolute';
+            gameContainer.style.left = '50%';
+            gameContainer.style.top = '50%';
+            gameContainer.style.transform = 'translate(-50%, -50%)';
+            
+            // Re-enable image smoothing after resize
+            ctx.imageSmoothingEnabled = false;
+        }
+        
+        // Initial resize
+        resizeCanvas();
+        
+        // Handle window resize
+        window.addEventListener('resize', resizeCanvas);
+        window.addEventListener('orientationchange', resizeCanvas);
+        
+        // Also resize when the page becomes visible (for home screen apps)
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                setTimeout(resizeCanvas, 100);
+            }
+        });
 
         // Background image
         const backgroundImage = new Image();
