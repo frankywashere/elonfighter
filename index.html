@@ -1330,16 +1330,7 @@
                 // Note: Flipping is handled inside spriteManager.drawSprite
                 // so we don't need to do it here for sprites
                 
-                // Shadow
-                if (!isAfterImage) {
-                    ctx.save();
-                    ctx.globalAlpha = 0.3;
-                    ctx.fillStyle = '#000';
-                    ctx.beginPath();
-                    ctx.ellipse(this.x, GROUND_Y + 5, 40, 10, 0, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.restore();
-                }
+                // Shadow is now drawn separately in drawShadow() method
                 
                 // Invincibility flash
                 if (this.invincibleFrames > 0 && !isAfterImage) {
@@ -3520,6 +3511,62 @@
                 }
             }
 
+            drawShadow() {
+                ctx.save();
+                
+                // Calculate shadow properties based on height
+                const heightFromGround = GROUND_Y - this.y;
+                const shadowScale = Math.max(0.3, 1 - (heightFromGround / 300)); // Shadow gets smaller when jumping
+                const shadowOpacity = Math.max(0.2, 0.7 - (heightFromGround / 400)); // Shadow fades when high up
+                
+                // Shadow position - place it lower on the ground
+                // Add extra offset to position shadow properly below the feet
+                const shadowY = GROUND_Y + 40; // Move shadow significantly lower
+                const shadowX = this.x; // Centered like the sprite
+                
+                // Create elliptical shadow
+                ctx.translate(shadowX, shadowY);
+                ctx.scale(1.2 * shadowScale, 0.3 * shadowScale); // Wider than tall
+                
+                // Multi-layered shadow for realism
+                // Outer soft shadow
+                const outerGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, 60);
+                outerGradient.addColorStop(0, `rgba(0, 0, 0, ${shadowOpacity * 0.3})`);
+                outerGradient.addColorStop(0.5, `rgba(0, 0, 0, ${shadowOpacity * 0.2})`);
+                outerGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                
+                ctx.fillStyle = outerGradient;
+                ctx.beginPath();
+                ctx.arc(0, 0, 60, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Inner contact shadow (darker when on ground)
+                if (this.grounded) {
+                    const innerGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, 40);
+                    innerGradient.addColorStop(0, `rgba(0, 0, 0, ${shadowOpacity * 0.6})`);
+                    innerGradient.addColorStop(0.7, `rgba(0, 0, 0, ${shadowOpacity * 0.3})`);
+                    innerGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                    
+                    ctx.fillStyle = innerGradient;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 40, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                // Dynamic shadow based on character state
+                if (this.state === 'shoryuken' || this.state === 'tatsumaki') {
+                    // Add motion blur to shadow during special moves
+                    ctx.globalAlpha = shadowOpacity * 0.3;
+                    ctx.scale(1.5, 1);
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+                    ctx.beginPath();
+                    ctx.arc(-10 * this.facing, 0, 30, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                ctx.restore();
+            }
+
             draw(renderAttacks = true) {
                 // Render character body
                 this.drawCharacterSprite();
@@ -4355,24 +4402,133 @@
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
             }
             
-            // Ground/concrete overlay (to ensure characters have a clear ground)
-            ctx.fillStyle = 'rgba(42, 49, 56, 0.8)';
+            // Creative arena floor design
+            
+            // Create reflective metallic floor base
+            const floorGradient = ctx.createLinearGradient(0, GROUND_Y, 0, canvas.height);
+            floorGradient.addColorStop(0, '#2a3f5f');     // Dark blue-gray at top
+            floorGradient.addColorStop(0.3, '#1e2936');   // Darker middle
+            floorGradient.addColorStop(0.7, '#141a24');   // Very dark
+            floorGradient.addColorStop(1, '#0a0d12');     // Almost black at bottom
+            ctx.fillStyle = floorGradient;
             ctx.fillRect(0, GROUND_Y, canvas.width, canvas.height - GROUND_Y);
             
-            // Ground texture lines
-            ctx.strokeStyle = '#1f262b';
+            // Add hexagonal tech pattern
+            const hexSize = 30;
+            const time = Date.now() * 0.001;
+            ctx.save();
+            ctx.globalAlpha = 0.3;
+            
+            for (let row = 0; row < 3; row++) {
+                for (let col = -1; col < canvas.width / hexSize + 2; col++) {
+                    const x = col * hexSize * 1.5;
+                    const y = GROUND_Y + row * hexSize * 0.866 + (col % 2) * hexSize * 0.433;
+                    
+                    // Pulsing effect
+                    const pulse = Math.sin(time + col * 0.3 + row * 0.5) * 0.2 + 0.8;
+                    
+                    ctx.beginPath();
+                    // Draw hexagon
+                    for (let i = 0; i < 6; i++) {
+                        const angle = (Math.PI / 3) * i;
+                        const hx = x + hexSize * 0.5 * Math.cos(angle);
+                        const hy = y + hexSize * 0.5 * Math.sin(angle);
+                        if (i === 0) ctx.moveTo(hx, hy);
+                        else ctx.lineTo(hx, hy);
+                    }
+                    ctx.closePath();
+                    
+                    // Gradient fill for each hexagon
+                    const hexGradient = ctx.createRadialGradient(x, y, 0, x, y, hexSize);
+                    hexGradient.addColorStop(0, `rgba(100, 150, 255, ${0.2 * pulse})`);
+                    hexGradient.addColorStop(1, 'rgba(100, 150, 255, 0)');
+                    ctx.fillStyle = hexGradient;
+                    ctx.fill();
+                    
+                    ctx.strokeStyle = `rgba(150, 200, 255, ${0.4 * pulse})`;
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                }
+            }
+            ctx.restore();
+            
+            // Add glowing energy lines
+            ctx.save();
+            ctx.globalAlpha = 0.6;
+            
+            // Main energy line
+            ctx.beginPath();
+            ctx.moveTo(0, GROUND_Y + 5);
+            for (let x = 0; x <= canvas.width; x += 10) {
+                const wave = Math.sin(x * 0.02 + time * 2) * 3;
+                ctx.lineTo(x, GROUND_Y + 5 + wave);
+            }
+            ctx.strokeStyle = '#00ffff';
+            ctx.lineWidth = 3;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#00ffff';
+            ctx.stroke();
+            
+            // Secondary energy line
+            ctx.beginPath();
+            ctx.moveTo(0, GROUND_Y + 15);
+            for (let x = 0; x <= canvas.width; x += 10) {
+                const wave = Math.sin(x * 0.03 + time * 1.5 + Math.PI) * 2;
+                ctx.lineTo(x, GROUND_Y + 15 + wave);
+            }
+            ctx.strokeStyle = '#ff00ff';
+            ctx.lineWidth = 2;
+            ctx.shadowBlur = 8;
+            ctx.shadowColor = '#ff00ff';
+            ctx.stroke();
+            ctx.restore();
+            
+            // Reflective highlights
+            ctx.save();
+            ctx.globalAlpha = 0.1;
+            const reflectionGradient = ctx.createLinearGradient(0, GROUND_Y, 0, GROUND_Y + 40);
+            reflectionGradient.addColorStop(0, 'rgba(255, 255, 255, 0.3)');
+            reflectionGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            ctx.fillStyle = reflectionGradient;
+            ctx.fillRect(0, GROUND_Y, canvas.width, 40);
+            ctx.restore();
+            
+            // Stage boundary markers with energy fields
+            ctx.save();
+            
+            // Left boundary
+            const leftGlow = ctx.createRadialGradient(20, GROUND_Y - 10, 0, 20, GROUND_Y - 10, 30);
+            leftGlow.addColorStop(0, 'rgba(255, 100, 100, 0.8)');
+            leftGlow.addColorStop(1, 'rgba(255, 100, 100, 0)');
+            ctx.fillStyle = leftGlow;
+            ctx.fillRect(0, GROUND_Y - 40, 50, 50);
+            
+            // Right boundary
+            const rightGlow = ctx.createRadialGradient(canvas.width - 20, GROUND_Y - 10, 0, canvas.width - 20, GROUND_Y - 10, 30);
+            rightGlow.addColorStop(0, 'rgba(255, 100, 100, 0.8)');
+            rightGlow.addColorStop(1, 'rgba(255, 100, 100, 0)');
+            ctx.fillStyle = rightGlow;
+            ctx.fillRect(canvas.width - 50, GROUND_Y - 40, 50, 50);
+            
+            ctx.restore();
+            
+            // Add perspective grid lines
+            ctx.save();
+            ctx.globalAlpha = 0.2;
+            ctx.strokeStyle = '#6495ed';
             ctx.lineWidth = 1;
-            for (let i = 0; i < canvas.width; i += 30) {
+            
+            const vanishingPointX = canvas.width / 2;
+            const vanishingPointY = GROUND_Y - 200;
+            
+            for (let i = 0; i <= 10; i++) {
+                const x = (canvas.width / 10) * i;
                 ctx.beginPath();
-                ctx.moveTo(i, GROUND_Y);
-                ctx.lineTo(i, canvas.height);
+                ctx.moveTo(x, canvas.height);
+                ctx.lineTo(vanishingPointX, vanishingPointY);
                 ctx.stroke();
             }
-            
-            // Stage boundaries
-            ctx.fillStyle = '#334455';
-            ctx.fillRect(0, GROUND_Y - 10, 40, 10);
-            ctx.fillRect(canvas.width - 40, GROUND_Y - 10, 40, 10);
+            ctx.restore();
         }
 
         // Initialize game
@@ -4878,6 +5034,9 @@
                     drawOrder = [opponent, fighter];
                 }
             });
+            
+            // Draw shadows first (so they appear under fighters)
+            drawOrder.forEach(fighter => fighter.drawShadow());
             
             // Draw fighters in determined order
             drawOrder.forEach(fighter => fighter.draw(true));
