@@ -271,6 +271,7 @@
         
         // Debug sprite positioning - adjust these values if sprites float or sink
         let SPRITE_DEBUG_MODE = false;  // Set to true to show sprite bounds
+        let HITBOX_DEBUG_MODE = true;   // Set to true to visualize hitboxes and hurtboxes
         let SPRITE_Y_OFFSET = 54;  // Correct offset for sprite positioning
         const THROW_TECH_WINDOW = 7;
 
@@ -292,9 +293,12 @@
                             'walk3': 'walking3.png', // Third frame
                             'crouch': 'crouch.png',  // Now we have a crouch sprite!
                             'jump': 'jump-elon.png',
-                            'P': 'punch.png',  // Standing punch
-                            'P2': 'punch2.png', // Alternative punch
+                            'punch': 'punch.png',  // Standing punch
+                            'punch2': 'punch2.png', // Alternative punch
+                            'P': 'punch.png',  // Alias for move
+                            'P2': 'punch2.png', // Alias for move
                             'K': 'kick-elon.png',   // Standing kick
+                            'kick-standing': 'kick-elon.png',  // Alias
                             'crP': 'crouch-punch.png', // Crouch punch
                             'crK': 'crouch-kick.png',  // Crouch kick
                             'jP': 'jumppunch-elon.png',    // Jump punch
@@ -317,18 +321,20 @@
                             'walk2': 'standing.png',  // Alternate frame for walk animation
                             'crouch': 'crouch.png',
                             'jump': 'jump.png',
-                            'P': 'punch-standing.png',  // Standing punch
+                            'punch': 'punch-standing.png',  // Standing punch
+                            'P': 'punch-standing.png',  // Alias for move
                             'K': 'kick-standing.png',   // Standing kick
+                            'kick-standing': 'kick-standing.png',  // Alias
                             'crP': 'crouch-punch.png', // Crouch punch
                             'crK': 'crouch-kick.png',  // Crouch kick
                             'jP': 'jump.png',    // Use jump sprite for jump punch
                             'jK': 'jump-kick.png',     // Jump kick
                             'block': 'crouch-block.png',
-                            'hit': 'standing.png',
+                            'hit': 'hit.png',  // Now Trump has a hit sprite too!
                             'knockdown': 'thrown.png',  // Use thrown sprite for knockdown
                             'beingThrown': 'thrown.png',
-                            'dizzy': 'standing.png',  // Use standing for dizzy
-                            'hitstun': 'standing.png'  // Use standing for hitstun
+                            'dizzy': 'hit.png',  // Use hit for dizzy
+                            'hitstun': 'hit.png'  // Use hit for hitstun
                         }
                     }
                 };
@@ -1185,9 +1191,10 @@
                             // Handle punch cycling for variety
                             if (this.currentMove === 'P' && this.characterName === 'elon') {
                                 // Alternate between punch sprites
-                                spriteState = (this.punchCount % 2 === 0) ? 'P' : 'P2';
+                                spriteState = (this.punchCount % 2 === 0) ? 'punch' : 'punch2';
                             } else {
-                                spriteState = this.currentMove;  // Use move name directly
+                                // Direct mapping - move names should match sprite keys
+                                spriteState = this.currentMove;
                             }
                         } else {
                             spriteState = 'idle';
@@ -1256,7 +1263,7 @@
                     
                     // Attempt to draw sprite
                     if (useSprite && spriteState) {
-                        // console.log(`[SPRITE ATTEMPT] Character: ${this.characterName}, State: ${this.state}, SpriteState: ${spriteState}`);
+                        // console.log(`[SPRITE ATTEMPT] Character: ${this.characterName}, State: ${this.state}, SpriteState: ${spriteState}, CurrentMove: ${this.currentMove}`);
                         const spriteDrawn = spriteManager.drawSprite(
                             ctx, 
                             this.characterName, 
@@ -2443,15 +2450,19 @@
                     return; // No hurtboxes during invincibility
                 }
                 
-                // Hurtboxes based on state
+                // Hurtboxes based on state - properly scaled for large sprites
+                const spriteScale = 0.41;
+                const baseHeight = 728 * spriteScale; // ~298 pixels tall
+                
                 if (this.knockdownFrames > 0) {
-                    this.hurtboxes.push({ x: -40, y: -20, width: 80, height: 20 });
+                    this.hurtboxes.push({ x: -120, y: -50, width: 240, height: 50 });
                 } else if (this.crouching) {
-                    this.hurtboxes.push({ x: -25, y: -60, width: 50, height: 60 });
+                    this.hurtboxes.push({ x: -80, y: -180, width: 160, height: 180 });
                 } else if (!this.grounded) {
-                    this.hurtboxes.push({ x: -25, y: -90, width: 50, height: 90 });
+                    this.hurtboxes.push({ x: -80, y: -280, width: 160, height: 280 });
                 } else {
-                    this.hurtboxes.push({ x: -25, y: -100, width: 50, height: 100 });
+                    // Standing hurtbox - full character height
+                    this.hurtboxes.push({ x: -80, y: -baseHeight, width: 160, height: baseHeight });
                 }
                 
                 // Attack hitboxes - don't generate during throwing animation
@@ -3152,8 +3163,15 @@
                 }
             }
 
-            draw() {
+            draw(renderAttacks = true) {
+                // Render character body
                 this.drawCharacterSprite();
+                
+                // Render attacks based on character-specific layering
+                if (renderAttacks && this.state === 'attack' && this.currentMove) {
+                    this.drawAttackLayer();
+                }
+                
                 this.drawHealthBar(this.isPlayer ? 50 : 560, 50);
                 
                 // Debug facing indicator
@@ -3166,6 +3184,126 @@
                     ctx.fillText(`Facing: ${arrow}`, this.x, this.y - 120);
                     ctx.restore();
                 }
+                
+                // Debug hitbox/hurtbox visualization
+                if (HITBOX_DEBUG_MODE) {
+                    ctx.save();
+                    
+                    // Draw hurtboxes (where you can be hit) in blue
+                    ctx.strokeStyle = this.isPlayer ? '#0088ff' : '#8800ff';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([5, 5]);
+                    this.hurtboxes.forEach(box => {
+                        ctx.strokeRect(
+                            this.x + box.x,
+                            this.y + box.y,
+                            box.width,
+                            box.height
+                        );
+                    });
+                    
+                    // Draw hitboxes (where you can hit) in red/green
+                    ctx.strokeStyle = this.isPlayer ? '#00ff00' : '#ff0000';
+                    ctx.lineWidth = 3;
+                    ctx.setLineDash([]);
+                    this.hitboxes.forEach(box => {
+                        if (box.type === 'throw') {
+                            ctx.strokeStyle = '#ffff00';  // Yellow for throws
+                        }
+                        ctx.strokeRect(
+                            this.x + box.x,
+                            this.y + box.y,
+                            box.width,
+                            box.height
+                        );
+                        
+                        // Label the hitbox type
+                        ctx.fillStyle = ctx.strokeStyle;
+                        ctx.font = '12px monospace';
+                        ctx.fillText(
+                            box.type || 'hit',
+                            this.x + box.x + 2,
+                            this.y + box.y + 12
+                        );
+                    });
+                    
+                    // Draw character center point
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    ctx.restore();
+                }
+            }
+            
+            drawAttackLayer() {
+                // Draw attack effects based on the current move
+                if (!this.currentMove || this.state !== 'attack') return;
+                
+                // Get current sprite for accurate positioning
+                const spriteKey = this.getSpriteKey();
+                
+                // Draw attack trail effects for special moves
+                if (this.currentMove === 'tatsumaki' || this.currentMove === 'shoryuken') {
+                    ctx.save();
+                    ctx.globalAlpha = 0.6;
+                    
+                    // Draw motion blur effect
+                    for (let i = 1; i <= 3; i++) {
+                        ctx.globalAlpha = 0.6 - (i * 0.15);
+                        ctx.save();
+                        ctx.translate(this.x - (this.facing * i * 15), this.y - (i * 5));
+                        this.drawCharacterSprite(true);
+                        ctx.restore();
+                    }
+                    
+                    ctx.restore();
+                }
+                
+                // Draw impact effects for punches and kicks
+                if (this.hitboxes.length > 0 && this.moveFrame >= FRAME_DATA[this.currentMove].startup) {
+                    this.hitboxes.forEach(hitbox => {
+                        // Draw a subtle glow around the attacking limb
+                        ctx.save();
+                        ctx.globalAlpha = 0.3;
+                        ctx.fillStyle = this.isPlayer ? '#00ff00' : '#ff0000';
+                        ctx.shadowBlur = 20;
+                        ctx.shadowColor = this.isPlayer ? '#00ff00' : '#ff0000';
+                        
+                        const hitX = this.x + hitbox.x + hitbox.width / 2;
+                        const hitY = this.y + hitbox.y + hitbox.height / 2;
+                        
+                        ctx.beginPath();
+                        ctx.arc(hitX, hitY, hitbox.width / 2, 0, Math.PI * 2);
+                        ctx.fill();
+                        
+                        ctx.restore();
+                    });
+                }
+            }
+            
+            getSpriteKey() {
+                // Get the current sprite key for this state
+                let spriteState = 'idle';
+                
+                if (this.state === 'attack' && this.currentMove) {
+                    if (this.currentMove === 'P' && this.characterName === 'elon') {
+                        spriteState = (this.punchCount % 2 === 0) ? 'punch' : 'punch2';
+                    } else {
+                        const moveSpriteMap = {
+                            'P': 'punch',
+                            'K': 'kick-standing',
+                            'crP': 'crouch-punch',
+                            'crK': 'crouch-kick',
+                            'jP': 'jumppunch-elon',
+                            'jK': 'jump-kick'
+                        };
+                        spriteState = moveSpriteMap[this.currentMove] || this.currentMove;
+                    }
+                }
+                
+                return spriteState;
             }
         }
 
@@ -3244,27 +3382,85 @@
             }
         }
 
-        // Frame data for simplified 2-button system
+        // Advanced frame data with precise hitbox definitions - scaled for large sprites
         const FRAME_DATA = {
-            // Standing attacks
-            P: { startup: 5, active: 3, recovery: 12, damage: 5, hitstun: 16, blockstun: 13, pushback: 2, cancelable: true },
-            K: { startup: 7, active: 4, recovery: 18, damage: 7, hitstun: 20, blockstun: 17, pushback: 4, cancelable: false },
+            // Standing attacks - hitboxes represent fist/foot position
+            P: { 
+                startup: 5, active: 3, recovery: 12, damage: 5, 
+                hitstun: 16, blockstun: 13, pushback: 2, cancelable: true,
+                hitboxes: [
+                    { x: 90, y: -230, width: 60, height: 50 }  // Fist at shoulder height
+                ]
+            },
+            K: { 
+                startup: 7, active: 4, recovery: 18, damage: 7, 
+                hitstun: 20, blockstun: 17, pushback: 4, cancelable: false,
+                hitboxes: [
+                    { x: 100, y: -180, width: 70, height: 60 },  // Knee/thigh
+                    { x: 130, y: -120, width: 60, height: 50 }   // Foot extension
+                ]
+            },
             
             // Crouching attacks
-            crP: { startup: 4, active: 3, recovery: 10, damage: 4, hitstun: 14, blockstun: 11, pushback: 1, cancelable: true, low: false },
-            crK: { startup: 6, active: 4, recovery: 16, damage: 6, hitstun: 0, blockstun: 14, pushback: 3, knockdown: true, low: true },
+            crP: { 
+                startup: 4, active: 3, recovery: 10, damage: 4, 
+                hitstun: 14, blockstun: 11, pushback: 1, cancelable: true, low: false,
+                hitboxes: [
+                    { x: 80, y: -140, width: 56, height: 44 }  // Lower fist position
+                ]
+            },
+            crK: { 
+                startup: 6, active: 4, recovery: 16, damage: 6, 
+                hitstun: 0, blockstun: 14, pushback: 3, knockdown: true, low: true,
+                hitboxes: [
+                    { x: 90, y: -50, width: 80, height: 40 }  // Sweep at foot level
+                ]
+            },
             
             // Jumping attacks
-            jP: { startup: 6, active: 8, recovery: 0, damage: 6, hitstun: 18, blockstun: 15, pushback: 2 },
-            jK: { startup: 8, active: 6, recovery: 0, damage: 8, hitstun: 22, blockstun: 18, pushback: 3 },
+            jP: { 
+                startup: 6, active: 8, recovery: 0, damage: 6, 
+                hitstun: 18, blockstun: 15, pushback: 2,
+                hitboxes: [
+                    { x: 80, y: -40, width: 64, height: 56 }  // Downward fist
+                ]
+            },
+            jK: { 
+                startup: 8, active: 6, recovery: 0, damage: 8, 
+                hitstun: 22, blockstun: 18, pushback: 3,
+                hitboxes: [
+                    { x: 90, y: -20, width: 90, height: 70 }  // Extended jump kick
+                ]
+            },
             
             // Special moves
-            hadouken: { startup: 13, active: 40, recovery: 40, damage: 8, hitstun: 20, blockstun: 16, pushback: 3, projectile: true },
-            shoryuken: { startup: 3, active: 14, recovery: 43, damage: 12, hitstun: 30, blockstun: 0, pushback: 5, invincible: 8, knockdown: true },
-            tatsumaki: { startup: 11, active: 24, recovery: 18, damage: 4, hitstun: 18, blockstun: 16, pushback: 4, hits: 3 },
+            hadouken: { 
+                startup: 13, active: 40, recovery: 40, damage: 8, 
+                hitstun: 20, blockstun: 16, pushback: 3, projectile: true,
+                hitboxes: []  // Projectile handles its own collision
+            },
+            shoryuken: { 
+                startup: 3, active: 14, recovery: 43, damage: 12, 
+                hitstun: 30, blockstun: 0, pushback: 5, invincible: 8, knockdown: true,
+                hitboxes: [
+                    { x: 50, y: -280, width: 70, height: 280 }  // Rising uppercut
+                ]
+            },
+            tatsumaki: { 
+                startup: 11, active: 24, recovery: 18, damage: 4, 
+                hitstun: 18, blockstun: 16, pushback: 4, hits: 3,
+                hitboxes: [
+                    { x: 100, y: -160, width: 80, height: 120 }  // Spinning kick
+                ]
+            },
             
             // Throw
-            throw: { startup: 3, active: 2, recovery: 24, damage: 12, range: THROW_RANGE }
+            throw: { 
+                startup: 3, active: 2, recovery: 24, damage: 12, range: THROW_RANGE,
+                hitboxes: [
+                    { x: 70, y: -200, width: 60, height: 160, type: 'throw' }
+                ]
+            }
         };
 
         // Input buffer system
@@ -3898,9 +4094,29 @@
             // Draw after images
             afterImages.forEach(img => img.draw());
             
-            // Draw fighters
-            player.draw();
-            aiPlayer.draw();
+            // Draw fighters with proper depth sorting and character-specific attack layering
+            const fighters = [player, aiPlayer].sort((a, b) => a.y - b.y);
+            
+            // First pass: Draw characters without attacks
+            fighters.forEach(fighter => fighter.draw(false));
+            
+            // Second pass: Draw attacks with character-specific layering
+            // Elon's attacks render behind opponents
+            const elonFighter = player.characterName === 'elon' ? player : aiPlayer;
+            const trumpFighter = player.characterName === 'trump' ? player : aiPlayer;
+            
+            // Draw Elon's attacks first (behind)
+            if (elonFighter.state === 'attack' && elonFighter.currentMove) {
+                ctx.save();
+                ctx.globalCompositeOperation = 'destination-over'; // Draw behind
+                elonFighter.drawAttackLayer();
+                ctx.restore();
+            }
+            
+            // Draw Trump's attacks last (on top)
+            if (trumpFighter.state === 'attack' && trumpFighter.currentMove) {
+                trumpFighter.drawAttackLayer();
+            }
             
             // Draw particles
             particles.forEach(p => p.draw());
