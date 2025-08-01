@@ -523,6 +523,12 @@
                         console.log('[DEBUG] AI attacks:', aiAttackDisabled ? 'DISABLED' : 'ENABLED');
                     }
                     
+                    // Toggle hitbox visualization with 'h' key
+                    if (key === 'h' || key === 'H') {
+                        HITBOX_DEBUG_MODE = !HITBOX_DEBUG_MODE;
+                        console.log('[DEBUG] Hitbox visualization:', HITBOX_DEBUG_MODE ? 'ON' : 'OFF');
+                    }
+                    
                     // Sprite scale adjustment with +/- keys
                     if (key === '=' || key === '+') {
                         spriteManager.spriteConfig.scale += 0.05;
@@ -1152,6 +1158,7 @@
                     ctx.shadowBlur = 20;
                     ctx.shadowColor = '#ffff00';
                 }
+                
                 
                 // Draw based on state
                 const baseY = this.y + this.breathingOffset;
@@ -2450,19 +2457,24 @@
                     return; // No hurtboxes during invincibility
                 }
                 
-                // Hurtboxes based on state - properly scaled for large sprites
+                // Hurtboxes based on state - tightly encompass the character
                 const spriteScale = 0.41;
-                const baseHeight = 728 * spriteScale; // ~298 pixels tall
+                const spriteHeight = 728 * spriteScale; // ~298 pixels tall
+                const characterHeight = spriteHeight * 0.9; // Character takes up 90% of sprite
                 
                 if (this.knockdownFrames > 0) {
-                    this.hurtboxes.push({ x: -120, y: -50, width: 240, height: 50 });
+                    // Lying down hitbox - close to ground
+                    this.hurtboxes.push({ x: -100, y: -50, width: 200, height: 50 });
                 } else if (this.crouching) {
-                    this.hurtboxes.push({ x: -80, y: -180, width: 160, height: 180 });
+                    // Crouching - about 50% of character height
+                    const crouchHeight = characterHeight * 0.5;
+                    this.hurtboxes.push({ x: -60, y: -crouchHeight, width: 120, height: crouchHeight });
                 } else if (!this.grounded) {
-                    this.hurtboxes.push({ x: -80, y: -280, width: 160, height: 280 });
+                    // Jumping - full character height
+                    this.hurtboxes.push({ x: -60, y: -characterHeight + 20, width: 120, height: characterHeight - 20 });
                 } else {
-                    // Standing hurtbox - full character height
-                    this.hurtboxes.push({ x: -80, y: -baseHeight, width: 160, height: baseHeight });
+                    // Standing hurtbox - from feet to head
+                    this.hurtboxes.push({ x: -60, y: -characterHeight, width: 120, height: characterHeight });
                 }
                 
                 // Attack hitboxes - don't generate during throwing animation
@@ -3018,10 +3030,29 @@
                         ));
                     }
                     
-                    // Hit spark effect
+                    // Hit spark effect - position at impact point
+                    // Get the actual hit location from the attacker's move data
+                    let sparkX = this.x + this.facing * 30;
+                    let sparkY = this.y - 150; // Default to mid-body
+                    
+                    // If we have attacker info and move data with impact point
+                    if (attacker && attacker.currentMove) {
+                        const moveData = FRAME_DATA[attacker.currentMove];
+                        if (moveData && moveData.impactPoint) {
+                            // Use the predefined impact point, adjusted for facing
+                            sparkX = attacker.x + (attacker.facing === 1 ? moveData.impactPoint.x : -moveData.impactPoint.x);
+                            sparkY = attacker.y + moveData.impactPoint.y;
+                        } else if (attacker.hitboxes.length > 0) {
+                            // Fallback to hitbox center
+                            const hitbox = attacker.hitboxes[0];
+                            sparkX = attacker.x + hitbox.x + hitbox.width / 2;
+                            sparkY = attacker.y + hitbox.y + hitbox.height / 2;
+                        }
+                    }
+                    
                     particles.push({
-                        x: this.x + this.facing * 30,
-                        y: this.y - 60,
+                        x: sparkX,
+                        y: sparkY,
                         life: 15,
                         type: 'hitSpark',
                         size: 40,
@@ -3390,7 +3421,9 @@
                 hitstun: 16, blockstun: 13, pushback: 2, cancelable: true,
                 hitboxes: [
                     { x: 90, y: -230, width: 60, height: 50 }  // Fist at shoulder height
-                ]
+                ],
+                // Impact point - where the fist actually is in the sprite
+                impactPoint: { x: 120, y: -230 }
             },
             K: { 
                 startup: 7, active: 4, recovery: 18, damage: 7, 
@@ -3398,7 +3431,9 @@
                 hitboxes: [
                     { x: 100, y: -180, width: 70, height: 60 },  // Knee/thigh
                     { x: 130, y: -120, width: 60, height: 50 }   // Foot extension
-                ]
+                ],
+                // Impact point - where the foot strikes
+                impactPoint: { x: 160, y: -120 }
             },
             
             // Crouching attacks
@@ -3407,14 +3442,16 @@
                 hitstun: 14, blockstun: 11, pushback: 1, cancelable: true, low: false,
                 hitboxes: [
                     { x: 80, y: -140, width: 56, height: 44 }  // Lower fist position
-                ]
+                ],
+                impactPoint: { x: 108, y: -140 }
             },
             crK: { 
                 startup: 6, active: 4, recovery: 16, damage: 6, 
                 hitstun: 0, blockstun: 14, pushback: 3, knockdown: true, low: true,
                 hitboxes: [
                     { x: 90, y: -50, width: 80, height: 40 }  // Sweep at foot level
-                ]
+                ],
+                impactPoint: { x: 130, y: -50 }
             },
             
             // Jumping attacks
@@ -3423,14 +3460,16 @@
                 hitstun: 18, blockstun: 15, pushback: 2,
                 hitboxes: [
                     { x: 80, y: -40, width: 64, height: 56 }  // Downward fist
-                ]
+                ],
+                impactPoint: { x: 112, y: -40 }
             },
             jK: { 
                 startup: 8, active: 6, recovery: 0, damage: 8, 
                 hitstun: 22, blockstun: 18, pushback: 3,
                 hitboxes: [
                     { x: 90, y: -20, width: 90, height: 70 }  // Extended jump kick
-                ]
+                ],
+                impactPoint: { x: 135, y: -20 }
             },
             
             // Special moves
@@ -4094,29 +4133,55 @@
             // Draw after images
             afterImages.forEach(img => img.draw());
             
-            // Draw fighters with proper depth sorting and character-specific attack layering
+            // Draw fighters with proper depth sorting
             const fighters = [player, aiPlayer].sort((a, b) => a.y - b.y);
             
-            // First pass: Draw characters without attacks
-            fighters.forEach(fighter => fighter.draw(false));
-            
-            // Second pass: Draw attacks with character-specific layering
-            // Elon's attacks render behind opponents
+            // Determine which fighter is Elon and which is Trump
             const elonFighter = player.characterName === 'elon' ? player : aiPlayer;
             const trumpFighter = player.characterName === 'trump' ? player : aiPlayer;
             
-            // Draw Elon's attacks first (behind)
-            if (elonFighter.state === 'attack' && elonFighter.currentMove) {
-                ctx.save();
-                ctx.globalCompositeOperation = 'destination-over'; // Draw behind
-                elonFighter.drawAttackLayer();
-                ctx.restore();
-            }
+            // Draw all fighters with proper depth sorting
+            fighters.forEach(fighter => fighter.draw(true));
             
-            // Draw Trump's attacks last (on top)
-            if (trumpFighter.state === 'attack' && trumpFighter.currentMove) {
-                trumpFighter.drawAttackLayer();
-            }
+            // Draw impact "splash" effects for active hits
+            fighters.forEach(fighter => {
+                if (fighter.state === 'attack' && fighter.currentMove && fighter.hitboxes.length > 0) {
+                    const moveData = FRAME_DATA[fighter.currentMove];
+                    if (moveData && moveData.impactPoint && fighter.moveFrame >= moveData.startup && 
+                        fighter.moveFrame < moveData.startup + moveData.active) {
+                        
+                        // Check if making contact
+                        const opponent = fighter === player ? aiPlayer : player;
+                        const hitbox = fighter.hitboxes[0];
+                        const hitboxX = fighter.x + hitbox.x;
+                        const hitboxY = fighter.y + hitbox.y;
+                        
+                        // Simple overlap check with opponent
+                        const hitting = hitboxX < opponent.x + 60 && 
+                                      hitboxX + hitbox.width > opponent.x - 60 &&
+                                      hitboxY < opponent.y && 
+                                      hitboxY + hitbox.height > opponent.y - 298;
+                        
+                        if (hitting) {
+                            // Draw impact effect at the impact point
+                            ctx.save();
+                            const impactX = fighter.x + (fighter.facing === 1 ? moveData.impactPoint.x : -moveData.impactPoint.x);
+                            const impactY = fighter.y + moveData.impactPoint.y;
+                            
+                            // Draw a bright impact flash
+                            ctx.globalAlpha = 0.8;
+                            ctx.fillStyle = '#ffffff';
+                            ctx.shadowBlur = 20;
+                            ctx.shadowColor = '#ffffff';
+                            ctx.beginPath();
+                            ctx.arc(impactX, impactY, 25, 0, Math.PI * 2);
+                            ctx.fill();
+                            
+                            ctx.restore();
+                        }
+                    }
+                }
+            });
             
             // Draw particles
             particles.forEach(p => p.draw());
