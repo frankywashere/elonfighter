@@ -1,0 +1,121 @@
+{
+  "walking2": {
+    "original_size": "600x900",
+    "crop_size": "383x879",
+    "final_size": "317x728",
+    "scale_factor": 0.83,
+    "canvas_size": "1092x873"
+  },
+  "walking3": {
+    "original_size": "600x900",
+    "crop_size": "528x880",
+    "final_size": "436x728",
+    "scale_factor": 0.83,
+    "canvas_size": "1092x873"
+  },
+  "walking1": {
+    "original_size": "600x900",
+    "crop_size": "527x861",
+    "final_size": "445x728",
+    "scale_factor": 0.85,
+    "canvas_size": "1092x873"
+  },
+  "jump-elon": {
+    "original_size": "621x930",
+    "crop_size": "479x679",
+    "final_size": "462x655",
+    "scale_factor": 0.96,
+    "canvas_size": "1092x873"
+  },
+  "crouch-punch": {
+    "original_size": "1536x1024",
+    "crop_size": "690x735",
+    "final_size": "478x509",
+    "scale_factor": 0.69,
+    "canvas_size": "1092x873"
+  },
+  "thrown": {
+    "original_size": "1408x792",
+    "crop_size": "797x649",
+    "final_size": "625x509",
+    "scale_factor": 0.79,
+    "canvas_size": "1092x873"
+  },
+  "crouch-block": {
+    "original_size": "1024x1536",
+    "crop_size": "850x1178",
+    "final_size": "367x509",
+    "scale_factor": 0.43,
+    "canvas_size": "1092x873"
+  },
+  "standing": {
+    "original_size": "1408x792",
+    "crop_size": "606x728",
+    "final_size": "606x728",
+    "scale_factor": 1.0,
+    "canvas_size": "1092x873"
+  },
+  "jump-kick": {
+    "original_size": "1050x700",
+    "crop_size": "629x578",
+    "final_size": "713x655",
+    "scale_factor": 1.13,
+    "canvas_size": "1092x873"
+  },
+  "jumppunch-elon": {
+    "original_size": "805x783",
+    "crop_size": "710x607",
+    "final_size": "766x655",
+    "scale_factor": 1.08,
+    "canvas_size": "1092x873"
+  },
+  "block": {
+    "original_size": "638x860",
+    "crop_size": "604x824",
+    "final_size": "533x728",
+    "scale_factor": 0.88,
+    "canvas_size": "1092x873"
+  },
+  "hit": {
+    "original_size": "650x650",
+    "crop_size": "414x522",
+    "final_size": "577x728",
+    "scale_factor": 1.39,
+    "canvas_size": "1092x873"
+  },
+  "crouch": {
+    "original_size": "1536x1024",
+    "crop_size": "521x795",
+    "final_size": "333x509",
+    "scale_factor": 0.64,
+    "canvas_size": "1092x873"
+  },
+  "punch": {
+    "original_size": "561x609",
+    "crop_size": "470x584",
+    "final_size": "585x728",
+    "scale_factor": 1.25,
+    "canvas_size": "1092x873"
+  },
+  "punch2": {
+    "original_size": "600x900",
+    "crop_size": "551x770",
+    "final_size": "520x728",
+    "scale_factor": 0.95,
+    "canvas_size": "1092x873"
+  },
+  "kick-elon": {
+    "original_size": "757x826",
+    "crop_size": "627x699",
+    "final_size": "653x728",
+    "scale_factor": 1.04,
+    "canvas_size": "1092x873"
+  },
+  "crouch-kick": {
+    "original_size": "1536x1024",
+    "crop_size": "907x822",
+    "final_size": "562x509",
+    "scale_factor": 0.62,
+    "canvas_size": "1092x873"
+  }
+}

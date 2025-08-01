@@ -284,29 +284,33 @@
                 // Sprite mappings for different characters
                 this.spriteMappings = {
                     'elon': {
-                        basePath: 'elon/2nd Elon/',
+                        basePath: 'elon/Elon1_normalized_v3/',
                         sprites: {
                             'idle': 'standing.png',
-                            'walk': 'standing.png',
-                            'crouch': 'crouching.png',
-                            'jump': 'jumping.png',  // Now we have a jump sprite!
-                            'P': 'punching-standing.png',  // Standing punch
-                            'K': 'kicking-standing.png',   // Standing kick
-                            'crP': 'punching-crouching.png', // Crouch punch
-                            'crK': 'kicking-crouching.png',  // Crouch kick
-                            'jP': 'jumping-punching.png',    // Jump punch
-                            'jK': 'kicking-jumping.png',     // Jump kick
-                            'block': 'blocking.png',
-                            'hit': 'standing.png',
-                            'knockdown': 'on-gound-knocked-out.png',
+                            'walk': 'walking1.png',  // First frame of walk cycle
+                            'walk2': 'walking2.png', // Second frame
+                            'walk3': 'walking3.png', // Third frame
+                            'crouch': 'crouch.png',  // Now we have a crouch sprite!
+                            'jump': 'jump-elon.png',
+                            'P': 'punch.png',  // Standing punch
+                            'P2': 'punch2.png', // Alternative punch
+                            'K': 'kick-elon.png',   // Standing kick
+                            'crP': 'crouch-punch.png', // Crouch punch
+                            'crK': 'crouch-kick.png',  // Crouch kick
+                            'jP': 'jumppunch-elon.png',    // Jump punch
+                            'jK': 'jump-kick.png',     // Jump kick
+                            'block': 'block.png',
+                            'crouch-block': 'crouch-block.png',  // Crouch blocking sprite
+                            'hit': 'hit.png',  // New hit sprite!
+                            'knockdown': 'thrown.png',  // Using thrown as knockdown
                             'beingThrown': 'thrown.png',
-                            'throwingOpponent': 'throwing-opponent.png',  // New throwing sprite
-                            'dizzy': 'standing.png',  // Use standing for dizzy
-                            'hitstun': 'standing.png'  // Use standing for hitstun
+                            'throwingOpponent': 'punch2.png',  // Using punch2 for throw
+                            'dizzy': 'hit.png',  // Use hit sprite for dizzy
+                            'hitstun': 'hit.png'  // Use hit sprite for hitstun
                         }
                     },
                     'trump': {
-                        basePath: 'trump1/',
+                        basePath: 'trump1_normalized_v3/',
                         sprites: {
                             'idle': 'standing.png',
                             'walk': 'walking-forward.png',  // Use the new walking sprite
@@ -331,7 +335,7 @@
                 
                 // Sprite scaling and positioning data
                 this.spriteConfig = {
-                    scale: 0.59,  // Default sprite scale
+                    scale: 0.41,  // Default sprite scale
                     anchorY: 0.95,  // Anchor point near feet (95% from top)
                     get offsetY() { return SPRITE_Y_OFFSET; },  // Use global offset for easy debugging
                     defaultWidth: 64,  // Expected sprite width
@@ -372,7 +376,7 @@
                     
                     img.onload = () => {
                         this.sprites[key] = img;
-                        console.log(`[SPRITES] Loaded: ${key}`);
+                        console.log(`[SPRITES] Loaded: ${key} (${img.width}x${img.height})`);
                         resolve(img);
                     };
                     
@@ -392,7 +396,11 @@
             
             drawSprite(ctx, characterName, state, x, y, facing = 1, rotation = 0) {
                 const sprite = this.getSprite(characterName, state);
-                if (!sprite) return false;
+                
+                if (!sprite) {
+                    // console.log(`[SPRITE] Missing sprite: ${characterName}_${state}`);
+                    return false;
+                }
                 
                 ctx.save();
                 
@@ -424,9 +432,7 @@
                     }
                 }
                 
-                // Draw sprite so its bottom aligns with y position
-                // x: centered
-                // y: draw upward from ground position
+                // Draw sprite - sprites are already normalized, so just center them
                 const drawX = -spriteWidth / 2;
                 const drawY = -spriteHeight + this.spriteConfig.offsetY / this.spriteConfig.scale;
                 
@@ -1031,6 +1037,9 @@
                 // Character identity for sprites
                 this.characterName = characterName;
                 
+                // Punch variety counter
+                this.punchCount = 0;
+                
                 // Physics
                 this.velocityX = 0;
                 this.velocityY = 0;
@@ -1142,7 +1151,7 @@
                 const baseY = this.y + this.breathingOffset;
                 
                 // Try to use sprites first if available
-                if (this.characterName && !isAfterImage) {
+                if (this.characterName) {
                     let spriteState = null;
                     let useSprite = true;
                     
@@ -1173,13 +1182,37 @@
                         } else if (this.currentMove === 'tatsumaki') {
                             spriteState = 'jK';  // Use jump kick for tatsumaki
                         } else if (this.currentMove) {
-                            spriteState = this.currentMove;  // Use move name directly
+                            // Handle punch cycling for variety
+                            if (this.currentMove === 'P' && this.characterName === 'elon') {
+                                // Alternate between punch sprites
+                                spriteState = (this.punchCount % 2 === 0) ? 'P' : 'P2';
+                            } else {
+                                spriteState = this.currentMove;  // Use move name directly
+                            }
                         } else {
                             spriteState = 'idle';
                         }
                     } else if (this.state === 'walk') {
-                        // Animated walk cycle for Trump character
-                        if (this.characterName === 'trump') {
+                        // Animated walk cycle
+                        if (this.characterName === 'elon') {
+                            // 3-frame walk cycle for Elon
+                            const walkCycleFrame = Math.floor(this.animTimer / 6) % 3;
+                            
+                            // Cycle through walk -> walk2 -> walk3
+                            if (walkCycleFrame === 0) {
+                                spriteState = 'walk';  // walking1.png
+                            } else if (walkCycleFrame === 1) {
+                                spriteState = 'walk2'; // walking2.png
+                            } else {
+                                spriteState = 'walk3'; // walking3.png
+                            }
+                            
+                            // Add a slight vertical bob for more natural movement
+                            if (!isAfterImage) {
+                                const bobAmount = Math.sin(this.animTimer * 0.2) * 1.5;
+                                this.breathingOffset = bobAmount;
+                            }
+                        } else if (this.characterName === 'trump') {
                             // Create a smooth walk cycle
                             // Use a slower cycle for more natural walking
                             const walkCycleFrame = Math.floor(this.animTimer / 8) % 4;
@@ -1200,16 +1233,30 @@
                         } else {
                             spriteState = 'walk';
                         }
+                    } else if (this.blocking && this.crouching) {
+                        // Crouch blocking - check if sprite exists
+                        if (this.characterName === 'elon') {
+                            spriteState = 'crouch-block';  // Use special crouch-block sprite
+                        } else {
+                            spriteState = 'crouch';  // Fallback to crouch
+                        }
                     } else if (this.state === 'crouch' || this.crouching) {
                         spriteState = 'crouch';
                     } else if (this.blocking) {
                         spriteState = 'block';
+                    } else if (this.state === 'hitstun') {
+                        spriteState = 'hitstun';
+                    } else if (this.state === 'blockstun') {
+                        spriteState = 'block';  // Use block sprite for blockstun
+                    } else if (this.state === 'dizzy') {
+                        spriteState = 'dizzy';
                     } else {
                         spriteState = 'idle';
                     }
                     
                     // Attempt to draw sprite
                     if (useSprite && spriteState) {
+                        // console.log(`[SPRITE ATTEMPT] Character: ${this.characterName}, State: ${this.state}, SpriteState: ${spriteState}`);
                         const spriteDrawn = spriteManager.drawSprite(
                             ctx, 
                             this.characterName, 
@@ -1243,6 +1290,8 @@
                 }
                 
                 // Fall back to shape-based drawing
+                // console.log(`[SPRITE FALLBACK] Character: ${this.characterName}, State: ${this.state}, Move: ${this.currentMove}, Grounded: ${this.grounded}, Crouching: ${this.crouching}`);
+                
                 if (this.state === 'knockdown' || this.knockdownFrames > 0) {
                     this.drawKnockdownSprite(baseY);
                 } else if (this.state === 'beingThrown') {
@@ -2311,6 +2360,11 @@
                 this.lastHitFrame = -999;  // Reset last hit frame
                 this.blocking = false;  // Clear blocking when attacking
                 this.inputBuffer.addButton(button);
+                
+                // Increment punch counter for variety
+                if (button === 'P') {
+                    this.punchCount++;
+                }
             }
 
             performSpecialMove(move) {
@@ -2888,36 +2942,6 @@
                     this.health -= chipDamage;
                     this.blockstunFrames = blockstun;
                     this.pushbackVelocity = -this.facing * pushback * 0.6;
-                    
-                    // Show "BLOCK DETECTED" text
-                    particles.push({
-                        x: this.x,
-                        y: this.y - 150,
-                        life: 60,
-                        type: 'blockText',
-                        text: 'BLOCK DETECTED',
-                        scale: 1,
-                        update() {
-                            this.life--;
-                            if (this.life > 50) {
-                                this.scale = Math.min(1.5, this.scale + 0.1);
-                            } else if (this.life < 10) {
-                                this.scale *= 0.9;
-                            }
-                        },
-                        draw() {
-                            ctx.save();
-                            ctx.globalAlpha = Math.min(1, this.life / 10);
-                            ctx.font = `bold ${20 * this.scale}px Arial`;
-                            ctx.fillStyle = '#00ff00';
-                            ctx.strokeStyle = '#000';
-                            ctx.lineWidth = 3;
-                            ctx.textAlign = 'center';
-                            ctx.strokeText(this.text, this.x, this.y);
-                            ctx.fillText(this.text, this.x, this.y);
-                            ctx.restore();
-                        }
-                    });
                     
                     // Show chip damage number
                     if (chipDamage > 0) {
