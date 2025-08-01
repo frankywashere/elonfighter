@@ -21,7 +21,7 @@ This is a Street Fighter II-style fighting game featuring Elon Musk and Donald T
 ### Trump (CPU/Player 2)
 - Sprite folder: `trump1_normalized_v3/`
 - Special moves:
-  - **Hadouken** (↓↘→ + Punch) - Classic blue energy projectile
+  - **Money Throw** (↓↘→ + Punch) - Throws money bills with "HUSH MONEY!" text, uses `cash.png` sprite
   - **Shoryuken** (→↓↘ + Punch) - Rising uppercut with invincibility frames  
   - **Tatsumaki** (↓↙← + Kick) - Spinning kick
 
@@ -66,13 +66,16 @@ This is a Street Fighter II-style fighting game featuring Elon Musk and Donald T
    - Created `FlameParticle` class for flame effects
    - Multi-hit projectile (5 hits, 3 damage each)
    - Frame data: 10f startup, 35f active, 25f recovery
-2. **Trump's Hadouken**:
-   - Keeps original blue energy ball projectile
-   - Single hit, 8 damage
-   - Classic SF2-style fireball
+2. **Trump's Money Throw**:
+   - Uses `cash.png` sprite for money bills
+   - Created `MoneyBill` class with physics simulation
+   - Multiple money bills spawn with "HUSH MONEY!" text effect
+   - Uses `punch-standing.png` sprite for animation
+   - Frame data: 20f duration, multi-hit capability
 3. **Implementation**:
    - Modified `Projectile` class to check `owner.characterName`
-   - Different behavior based on character (flamethrower vs hadouken)
+   - Different behavior based on character (flamethrower vs money throw)
+   - Created `TextEffect` class for special move text displays
    - Updated collision detection for multi-hit projectiles
    - Fixed sprite mapping so hadouken move uses 'powermove-1.png' for Elon
    - Updated both `drawCharacterSprite` and `getSpriteKey` methods to use correct sprite
@@ -121,6 +124,8 @@ elon game test/
 - Run sprite normalization after adding new sprites
 - Check sprite mappings in HTML when adding new animations
 - Flamethrower uses multi-hit collision with cooldown between hits
+- Trump's money throw uses MoneyBill particles with physics simulation
+- Text effects are implemented via TextEffect class for special moves
 - Mobile controls are implemented but may need testing
 
 ---
