@@ -3109,13 +3109,28 @@
                 
                 if (blocked) {
                     // Successful block - chip damage (special moves do more chip)
-                    const chipMultiplier = attacker?.currentMove?.includes('hadouken') || 
-                                         attacker?.currentMove?.includes('shoryuken') || 
-                                         attacker?.currentMove?.includes('tatsumaki') ? 0.15 : 0.05;
+                    let chipMultiplier = 0.05; // Default chip damage
+                    
+                    if (attacker?.currentMove?.includes('flamethrower')) {
+                        chipMultiplier = 0.75; // Flamethrower does 75% damage even when blocked!
+                    } else if (attacker?.currentMove?.includes('hadouken') || 
+                               attacker?.currentMove?.includes('shoryuken') || 
+                               attacker?.currentMove?.includes('tatsumaki')) {
+                        chipMultiplier = 0.15; // Regular special moves
+                    }
                     const chipDamage = Math.max(1, Math.floor(damage * chipMultiplier));
                     this.health -= chipDamage;
                     this.blockstunFrames = blockstun;
                     this.pushbackVelocity = -this.facing * pushback * 0.6;
+                    
+                    // Add "BLOCK!" text effect
+                    particles.push(new TextEffect(
+                        this.x,
+                        this.y - 150,
+                        'BLOCK!',
+                        this.crouching ? '#00ffff' : '#0080ff', // Cyan for crouch block, blue for stand block
+                        36
+                    ));
                     
                     // Show chip damage number
                     if (chipDamage > 0) {
@@ -3349,6 +3364,35 @@
                 // Render character body
                 this.drawCharacterSprite();
                 
+                // Draw blocking indicator
+                if (this.blocking) {
+                    ctx.save();
+                    
+                    // Draw a shield effect
+                    ctx.strokeStyle = this.crouching ? '#00ffff' : '#0080ff';
+                    ctx.lineWidth = 4;
+                    ctx.globalAlpha = 0.6 + Math.sin(Date.now() * 0.005) * 0.2; // Pulsing effect
+                    
+                    // Draw shield arc in front of character
+                    ctx.beginPath();
+                    const shieldX = this.x + (this.facing * 30);
+                    const shieldY = this.y - 50;
+                    const shieldRadius = 60;
+                    const startAngle = this.facing === 1 ? -Math.PI * 0.7 : -Math.PI * 0.3;
+                    const endAngle = this.facing === 1 ? Math.PI * 0.7 : Math.PI * 1.3;
+                    ctx.arc(shieldX, shieldY, shieldRadius, startAngle, endAngle);
+                    ctx.stroke();
+                    
+                    // Add blocking text above character
+                    ctx.globalAlpha = 1;
+                    ctx.fillStyle = this.crouching ? '#00ffff' : '#0080ff';
+                    ctx.font = 'bold 16px monospace';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(this.crouching ? 'LOW BLOCK' : 'HIGH BLOCK', this.x, this.y - 100);
+                    
+                    ctx.restore();
+                }
+                
                 // Render attacks based on character-specific layering
                 if (renderAttacks && this.state === 'attack' && this.currentMove) {
                     this.drawAttackLayer();
@@ -3529,7 +3573,7 @@
                 this.y = y;
                 this.facing = facing;
                 this.velocity = facing * (12 + Math.random() * 6);
-                this.yVel = -5 + Math.random() * 10; // Spread vertically
+                this.yVel = -2 + Math.random() * 4; // Reduced vertical spread
                 this.rotation = Math.random() * Math.PI * 2;
                 this.rotationSpeed = (Math.random() - 0.5) * 0.3;
                 this.life = 60;
@@ -3633,6 +3677,17 @@
                     this.particleSpawnTimer = 0;
                     this.hitCooldown = 0;
                     this.currentHits = 0;
+                    this.moveType = 'flamethrower'; // Special move type for high chip damage
+                    
+                    // Override moveData for flamethrower to ensure proper damage
+                    this.moveData = {
+                        damage: 3,  // Flamethrower damage per hit
+                        hitstun: 15,
+                        blockstun: 10,
+                        pushback: 2,
+                        hits: 5,
+                        projectile: true
+                    };
                 } else if (this.isMoneyThrow) {
                     // Money throw properties
                     this.moneyBills = [];
@@ -3641,11 +3696,12 @@
                     this.hitCooldown = 0;
                     this.currentHits = 0;
                     this.textShown = false;
+                    this.moveType = 'hadouken'; // Store move type for blocking checks
                     
                     // Ensure money throw has damage properties
                     if (!this.moveData.damage) {
                         this.moveData = {
-                            damage: 2,
+                            damage: 0.0125,  // Halved again
                             hitstun: 8,
                             blockstun: 6,
                             pushback: 1,
@@ -3699,8 +3755,8 @@
                     // Money throw update logic
                     if (this.duration > 0) {
                         // Spawn money bills
-                        if (this.duration % 3 === 0) { // Spawn every 3 frames
-                            for (let i = 0; i < 3; i++) {
+                        if (this.duration % 5 === 0) { // Spawn every 5 frames
+                            for (let i = 0; i < 2; i++) {
                                 this.moneyBills.push(new MoneyBill(
                                     this.x,
                                     this.y + (Math.random() - 0.5) * 40,
@@ -4424,13 +4480,29 @@
                                     billHit.y < hurt.y + hurt.height &&
                                     billHit.y + billHit.height > hurt.y) {
                                     
+                                    // Debug collision angle
+                                    if (defender.crouching && HITBOX_DEBUG_MODE) {
+                                        console.log('[MONEY] Hit crouch:', {
+                                            billY: bill.y,
+                                            hurtboxTop: hurt.y,
+                                            hurtboxBottom: hurt.y + hurt.height,
+                                            yVel: bill.yVel
+                                        });
+                                    }
+                                    
+                                    // Create a modified attacker object with the projectile's move type
+                                    const projectileAttacker = {
+                                        ...attacker,
+                                        currentMove: proj.moveType || 'hadouken'
+                                    };
+                                    
                                     defender.takeDamage(
                                         proj.moveData.damage,
                                         proj.moveData.hitstun,
                                         proj.moveData.blockstun,
                                         proj.moveData.pushback,
                                         false,
-                                        attacker
+                                        projectileAttacker
                                     );
                                     
                                     bill.hasHit = true;
@@ -4466,13 +4538,19 @@
                             projHit.y < hurt.y + hurt.height &&
                             projHit.y + projHit.height > hurt.y) {
                             
+                            // Create a modified attacker object with the projectile's move type
+                            const projectileAttacker = {
+                                ...attacker,
+                                currentMove: proj.moveType || 'hadouken'
+                            };
+                            
                             defender.takeDamage(
                                 proj.moveData.damage,
                                 proj.moveData.hitstun,
                                 proj.moveData.blockstun,
                                 proj.moveData.pushback,
                                 false,
-                                attacker
+                                projectileAttacker
                             );
                             
                             // For flamethrower, don't destroy projectile, just add hit cooldown
