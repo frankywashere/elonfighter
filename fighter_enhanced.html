@@ -247,6 +247,14 @@
         backgroundImage.onload = () => {
             backgroundLoaded = true;
         };
+        
+        // Cash image for Trump's money throw
+        const cashImage = new Image();
+        cashImage.src = 'trump1/cash.png';
+        let cashLoaded = false;
+        cashImage.onload = () => {
+            cashLoaded = true;
+        };
 
         // Global effects
         let screenShake = 0;
@@ -3513,8 +3521,99 @@
                 ctx.restore();
             }
         }
+        
+        // Money bill for Trump's money throw
+        class MoneyBill {
+            constructor(x, y, facing) {
+                this.x = x;
+                this.y = y;
+                this.facing = facing;
+                this.velocity = facing * (12 + Math.random() * 6);
+                this.yVel = -5 + Math.random() * 10; // Spread vertically
+                this.rotation = Math.random() * Math.PI * 2;
+                this.rotationSpeed = (Math.random() - 0.5) * 0.3;
+                this.life = 60;
+                this.scale = 0.7; // 30% smaller (70% of original size)
+                this.hasHit = false; // Track if this bill has hit
+                this.hitbox = { width: 40, height: 20 }; // Individual bill hitbox
+            }
+            
+            update() {
+                this.x += this.velocity;
+                this.y += this.yVel;
+                this.yVel += 0.3; // Gravity
+                this.rotation += this.rotationSpeed;
+                this.life--;
+                this.velocity *= 0.98; // Air resistance
+            }
+            
+            draw() {
+                if (!cashLoaded) return;
+                
+                const alpha = Math.min(1, this.life / 20);
+                ctx.save();
+                ctx.globalAlpha = alpha;
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.rotation);
+                ctx.scale(this.scale, this.scale);
+                
+                // Draw cash image at its actual size
+                ctx.drawImage(cashImage, -cashImage.width/2, -cashImage.height/2);
+                
+                ctx.restore();
+            }
+        }
 
-        // Enhanced Projectile class (supports both flamethrower and hadouken)
+        // Text effect for special moves
+        class TextEffect extends Particle {
+            constructor(x, y, text, color, size = 48) {
+                super(x, y, 'text');
+                this.text = text;
+                this.color = color;
+                this.size = size;
+                this.life = 60;
+                this.vx = 0;
+                this.vy = -2;
+                this.scale = 1;
+            }
+            
+            update() {
+                this.y += this.vy;
+                this.vy *= 0.95; // Slow down over time
+                this.life--;
+                
+                // Scale effect
+                if (this.life > 50) {
+                    this.scale = 1 + (60 - this.life) * 0.05;
+                } else if (this.life < 10) {
+                    this.scale = this.life / 10;
+                }
+            }
+            
+            draw() {
+                const alpha = Math.min(1, this.life / 30);
+                ctx.save();
+                ctx.globalAlpha = alpha;
+                ctx.translate(this.x, this.y);
+                ctx.scale(this.scale, this.scale);
+                
+                // Shadow/outline
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = 3;
+                ctx.font = `italic bold ${this.size}px 'Brush Script MT', cursive`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.strokeText(this.text, 0, 0);
+                
+                // Main text
+                ctx.fillStyle = this.color;
+                ctx.fillText(this.text, 0, 0);
+                
+                ctx.restore();
+            }
+        }
+
+        // Enhanced Projectile class (supports flamethrower, money throw, and hadouken)
         class Projectile {
             constructor(x, y, facing, owner, moveData) {
                 this.x = x;
@@ -3523,7 +3622,8 @@
                 this.owner = owner;
                 this.moveData = moveData;
                 this.active = true;
-                this.isFlamethrower = owner.characterName === 'elon'; // Only Elon has flamethrower
+                this.isFlamethrower = owner.characterName === 'elon';
+                this.isMoneyThrow = owner.characterName === 'trump';
                 
                 if (this.isFlamethrower) {
                     // Flamethrower properties
@@ -3533,8 +3633,28 @@
                     this.particleSpawnTimer = 0;
                     this.hitCooldown = 0;
                     this.currentHits = 0;
+                } else if (this.isMoneyThrow) {
+                    // Money throw properties
+                    this.moneyBills = [];
+                    this.duration = 20; // Shorter burst
+                    this.hitbox = { x: facing === 1 ? 0 : -100, y: -50, width: 100, height: 100 };
+                    this.hitCooldown = 0;
+                    this.currentHits = 0;
+                    this.textShown = false;
+                    
+                    // Ensure money throw has damage properties
+                    if (!this.moveData.damage) {
+                        this.moveData = {
+                            damage: 2,
+                            hitstun: 8,
+                            blockstun: 6,
+                            pushback: 1,
+                            hits: 4,
+                            projectile: true
+                        };
+                    }
                 } else {
-                    // Regular hadouken properties
+                    // Regular hadouken properties (for any future characters)
                     this.velocity = facing * 10;
                     this.hitbox = { x: -25, y: -25, width: 50, height: 50 };
                     this.rotation = 0;
@@ -3575,6 +3695,49 @@
                         this.hitbox.x = this.facing === 1 ? 0 : -(120 + spread);
                         this.hitbox.width = 120 + spread;
                     }
+                } else if (this.isMoneyThrow) {
+                    // Money throw update logic
+                    if (this.duration > 0) {
+                        // Spawn money bills
+                        if (this.duration % 3 === 0) { // Spawn every 3 frames
+                            for (let i = 0; i < 3; i++) {
+                                this.moneyBills.push(new MoneyBill(
+                                    this.x,
+                                    this.y + (Math.random() - 0.5) * 40,
+                                    this.facing
+                                ));
+                            }
+                        }
+                        this.duration--;
+                        
+                        // Show text effect once
+                        if (!this.textShown && this.duration > 15) {
+                            particles.push(new TextEffect(
+                                this.x,
+                                this.y - 100,
+                                'HUSH MONEY!',
+                                '#00ff00',
+                                30
+                            ));
+                            this.textShown = true;
+                        }
+                    }
+                    
+                    // Update money bills
+                    this.moneyBills = this.moneyBills.filter(bill => {
+                        bill.update();
+                        return bill.life > 0;
+                    });
+                    
+                    // Deactivate when no bills left
+                    if (this.moneyBills.length === 0 && this.duration <= 0) {
+                        this.active = false;
+                    }
+                    
+                    // Decrease hit cooldown for multi-hit
+                    if (this.hitCooldown > 0) {
+                        this.hitCooldown--;
+                    }
                 } else {
                     // Regular hadouken update logic
                     this.x += this.velocity;
@@ -3600,6 +3763,9 @@
                 if (this.isFlamethrower) {
                     // Draw all flame particles
                     this.particles.forEach(p => p.draw());
+                } else if (this.isMoneyThrow) {
+                    // Draw all money bills
+                    this.moneyBills.forEach(bill => bill.draw());
                 } else {
                     // Draw regular hadouken
                     ctx.save();
@@ -4231,9 +4397,53 @@
                 
                 // Projectile collisions
                 attacker.projectiles.forEach(proj => {
-                    // Skip if projectile is not active or recently hit
-                    if (!proj.active || proj.hitCooldown > 0) {
-                        if (proj.hitCooldown > 0) proj.hitCooldown--;
+                    // Skip if projectile is not active
+                    if (!proj.active) return;
+                    
+                    // Special handling for money throw - check each bill
+                    if (proj.isMoneyThrow) {
+                        proj.moneyBills.forEach(bill => {
+                            if (bill.hasHit || bill.life <= 0) return;
+                            
+                            defender.hurtboxes.forEach(hurtbox => {
+                                const billHit = {
+                                    x: bill.x - bill.hitbox.width / 2,
+                                    y: bill.y - bill.hitbox.height / 2,
+                                    width: bill.hitbox.width,
+                                    height: bill.hitbox.height
+                                };
+                                const hurt = {
+                                    x: defender.x + hurtbox.x,
+                                    y: defender.y + hurtbox.y,
+                                    width: hurtbox.width,
+                                    height: hurtbox.height
+                                };
+                                
+                                if (billHit.x < hurt.x + hurt.width &&
+                                    billHit.x + billHit.width > hurt.x &&
+                                    billHit.y < hurt.y + hurt.height &&
+                                    billHit.y + billHit.height > hurt.y) {
+                                    
+                                    defender.takeDamage(
+                                        proj.moveData.damage,
+                                        proj.moveData.hitstun,
+                                        proj.moveData.blockstun,
+                                        proj.moveData.pushback,
+                                        false,
+                                        attacker
+                                    );
+                                    
+                                    bill.hasHit = true;
+                                    bill.life = Math.min(bill.life, 10); // Make bill disappear quickly after hit
+                                }
+                            });
+                        });
+                        return;
+                    }
+                    
+                    // Regular projectile collision (flamethrower, hadouken)
+                    if (proj.hitCooldown > 0) {
+                        proj.hitCooldown--;
                         return;
                     }
                     
