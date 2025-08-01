@@ -271,7 +271,7 @@
         
         // Debug sprite positioning - adjust these values if sprites float or sink
         let SPRITE_DEBUG_MODE = false;  // Set to true to show sprite bounds
-        let HITBOX_DEBUG_MODE = true;   // Set to true to visualize hitboxes and hurtboxes
+        let HITBOX_DEBUG_MODE = false;   // Set to true to visualize hitboxes and hurtboxes
         let SPRITE_Y_OFFSET = 54;  // Correct offset for sprite positioning
         const THROW_TECH_WINDOW = 7;
 
@@ -1161,10 +1161,7 @@
                     const moveAmount = this.depthSwitchProgress * 5;
                     ctx.translate(this.facing * moveAmount, 0);
                     
-                    // 3. Motion blur effect
-                    if (this.depthSwitchProgress > 0.3) {
-                        ctx.filter = `blur(${this.depthSwitchProgress * 1}px)`;
-                    }
+                    // 3. Removed motion blur effect
                 }
                 
                 // Apply rotation for throw animation only when being thrown
@@ -1310,8 +1307,8 @@
                     if (spriteState !== this.previousSprite && !isAfterImage) {
                         // Check if this is an attack transition we should interpolate
                         const isAttackTransition = 
-                            (this.previousSprite === 'idle' && (spriteState === 'P' || spriteState === 'punch' || spriteState === 'punch2' || spriteState === 'K')) ||
-                            ((this.previousSprite === 'P' || this.previousSprite === 'punch' || this.previousSprite === 'punch2' || this.previousSprite === 'K') && spriteState === 'idle');
+                            (this.previousSprite === 'idle' && (spriteState === 'P' || spriteState === 'punch' || spriteState === 'punch2' || spriteState === 'K' || spriteState === 'cK' || spriteState === 'jK')) ||
+                            ((this.previousSprite === 'P' || this.previousSprite === 'punch' || this.previousSprite === 'punch2' || this.previousSprite === 'K' || this.previousSprite === 'cK' || this.previousSprite === 'jK') && spriteState === 'idle');
                         
                         if (isAttackTransition) {
                             this.spriteTransitionFrom = this.previousSprite;
@@ -1328,10 +1325,6 @@
                         
                         // Draw interpolated frames
                         ctx.save();
-                        
-                        // Add motion blur
-                        const blurAmount = Math.sin(progress * Math.PI) * 1.5;
-                        ctx.filter = `blur(${blurAmount}px)`;
                         
                         // Draw the "from" sprite with decreasing opacity
                         ctx.globalAlpha = 1 - progress;
@@ -1352,7 +1345,7 @@
                         let offsetX = 0;
                         if (this.spriteTransitionTo === 'P' || this.spriteTransitionTo === 'punch' || this.spriteTransitionTo === 'punch2') {
                             offsetX = Math.sin(progress * Math.PI * 0.5) * 3 * this.facing;
-                        } else if (this.spriteTransitionTo === 'K') {
+                        } else if (this.spriteTransitionTo === 'K' || this.spriteTransitionTo === 'cK' || this.spriteTransitionTo === 'jK') {
                             offsetX = Math.sin(progress * Math.PI * 0.5) * 5 * this.facing;
                         }
                         
