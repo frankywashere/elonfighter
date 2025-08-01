@@ -1119,6 +1119,9 @@
                 // Multi-hit tracking
                 this.currentMoveHits = 0;
                 this.lastHitFrame = -999;
+                
+                // Depth switch tracking
+                this.depthSwitchTimer = 0;
             }
 
             drawCharacterSprite(isAfterImage = false) {
@@ -4140,14 +4143,22 @@
             const elonFighter = player.characterName === 'elon' ? player : aiPlayer;
             const trumpFighter = player.characterName === 'trump' ? player : aiPlayer;
             
-            // Draw all fighters with proper depth sorting
-            fighters.forEach(fighter => fighter.draw(true));
+            // Dynamic depth switching based on active attacks
+            let drawOrder = [...fighters]; // Default to Y-sorted order
+            let impactFlashData = null; // Store impact flash info
             
-            // Draw impact "splash" effects for active hits
+            // Update depth switch timers
+            fighters.forEach(fighter => {
+                if (fighter.depthSwitchTimer > 0) {
+                    fighter.depthSwitchTimer--;
+                }
+            });
+            
+            // Check if any fighter is actively hitting
             fighters.forEach(fighter => {
                 if (fighter.state === 'attack' && fighter.currentMove && fighter.hitboxes.length > 0) {
                     const moveData = FRAME_DATA[fighter.currentMove];
-                    if (moveData && moveData.impactPoint && fighter.moveFrame >= moveData.startup && 
+                    if (moveData && fighter.moveFrame >= moveData.startup && 
                         fighter.moveFrame < moveData.startup + moveData.active) {
                         
                         // Check if making contact
@@ -4156,32 +4167,49 @@
                         const hitboxX = fighter.x + hitbox.x;
                         const hitboxY = fighter.y + hitbox.y;
                         
-                        // Simple overlap check with opponent
+                        // Check overlap with opponent's hurtbox
                         const hitting = hitboxX < opponent.x + 60 && 
                                       hitboxX + hitbox.width > opponent.x - 60 &&
                                       hitboxY < opponent.y && 
                                       hitboxY + hitbox.height > opponent.y - 298;
                         
                         if (hitting) {
-                            // Draw impact effect at the impact point
-                            ctx.save();
-                            const impactX = fighter.x + (fighter.facing === 1 ? moveData.impactPoint.x : -moveData.impactPoint.x);
-                            const impactY = fighter.y + moveData.impactPoint.y;
+                            // Set depth switch timer (active frames + 7 extra frames)
+                            fighter.depthSwitchTimer = moveData.active + 7;
                             
-                            // Draw a bright impact flash
-                            ctx.globalAlpha = 0.8;
-                            ctx.fillStyle = '#ffffff';
-                            ctx.shadowBlur = 20;
-                            ctx.shadowColor = '#ffffff';
-                            ctx.beginPath();
-                            ctx.arc(impactX, impactY, 25, 0, Math.PI * 2);
-                            ctx.fill();
-                            
-                            ctx.restore();
+                            // Store impact flash data for later
+                            if (moveData.impactPoint) {
+                                impactFlashData = {
+                                    x: fighter.x + (fighter.facing === 1 ? moveData.impactPoint.x : -moveData.impactPoint.x),
+                                    y: fighter.y + moveData.impactPoint.y
+                                };
+                            }
                         }
                     }
                 }
+                
+                // Apply depth switch if timer is active
+                if (fighter.depthSwitchTimer > 0) {
+                    const opponent = fighter === player ? aiPlayer : player;
+                    drawOrder = [opponent, fighter];
+                }
             });
+            
+            // Draw fighters in determined order
+            drawOrder.forEach(fighter => fighter.draw(true));
+            
+            // Draw impact flash on top of everything
+            if (impactFlashData) {
+                ctx.save();
+                ctx.globalAlpha = 0.8;
+                ctx.fillStyle = '#ffffff';
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(impactFlashData.x, impactFlashData.y, 25, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
             
             // Draw particles
             particles.forEach(p => p.draw());
