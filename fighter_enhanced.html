@@ -2240,6 +2240,18 @@
                 
                 // Check for incoming projectiles
                 const hasIncomingProjectile = opponent.projectiles.some(proj => {
+                    // For money throw, check individual bills
+                    if (proj.isMoneyThrow && proj.moneyBills) {
+                        return proj.moneyBills.some(bill => {
+                            if (bill.life <= 0) return false;
+                            const billDistance = Math.abs(bill.x - this.x);
+                            const billComingToward = (bill.facing === 1 && bill.x < this.x) || 
+                                                   (bill.facing === -1 && bill.x > this.x);
+                            return billComingToward && billDistance < 400; // Increased range for bills
+                        });
+                    }
+                    
+                    // Regular projectiles
                     const projDistance = Math.abs(proj.x - this.x);
                     const projComingToward = (proj.facing === 1 && proj.x < this.x) || 
                                            (proj.facing === -1 && proj.x > this.x);
@@ -2254,11 +2266,18 @@
                 const hasActiveThreat = (opponentHasActiveHitbox && distance < 200) || hasIncomingProjectile;
                 
                 // You're in blocking stance if:
-                // 1. Holding back AND there's an active threat
-                // 2. If no threat, only block if VERY close (< 80 units) to allow for walk-back at medium range
-                // This prevents getting stuck in block when trying to create space
+                // 1. Holding back AND there's an active threat (including projectiles)
+                // 2. Holding back AND opponent is in attack state within block range
+                // 3. Holding back AND very close to opponent
                 const veryClose = distance < 80;
-                this.blocking = holdingBack && !this.isDizzy && (hasActiveThreat || (veryClose && opponent.state === 'attack'));
+                const mediumRange = distance < 200;
+                
+                // More lenient blocking - if holding back and any threat exists
+                this.blocking = holdingBack && !this.isDizzy && 
+                    (hasActiveThreat || 
+                     hasIncomingProjectile || 
+                     (mediumRange && opponent.state === 'attack') ||
+                     veryClose);
                 
                 // Debug logging for player - log every frame to catch the stuck state
                 if (this.isPlayer) {
@@ -3055,7 +3074,7 @@
                 this.isThrowAttempt = false;
             }
 
-            takeDamage(damage, hitstun, blockstun, pushback, knockdown = false, attacker = null) {
+            takeDamage(damage, hitstun, blockstun, pushback, knockdown = false, attacker = null, projectile = false) {
                 // Check blocking at the moment of impact
                 const isLowAttack = FRAME_DATA[attacker?.currentMove]?.low;
                 
@@ -3113,24 +3132,23 @@
                     
                     if (attacker?.currentMove?.includes('flamethrower')) {
                         chipMultiplier = 0.75; // Flamethrower does 75% damage even when blocked!
-                    } else if (attacker?.currentMove?.includes('hadouken') || 
-                               attacker?.currentMove?.includes('shoryuken') || 
+                    } else if (attacker?.currentMove === 'hadouken' && projectile) {
+                        // Check if this is Trump's money throw by checking the damage value
+                        if (damage <= 0.02) {
+                            chipMultiplier = 0.01; // Money throw does almost no chip damage when blocked
+                        } else {
+                            chipMultiplier = 0.15; // Regular hadouken
+                        }
+                    } else if (attacker?.currentMove?.includes('shoryuken') || 
                                attacker?.currentMove?.includes('tatsumaki')) {
                         chipMultiplier = 0.15; // Regular special moves
                     }
-                    const chipDamage = Math.max(1, Math.floor(damage * chipMultiplier));
+                    const chipDamage = damage * chipMultiplier;
                     this.health -= chipDamage;
                     this.blockstunFrames = blockstun;
                     this.pushbackVelocity = -this.facing * pushback * 0.6;
                     
-                    // Add "BLOCK!" text effect
-                    particles.push(new TextEffect(
-                        this.x,
-                        this.y - 150,
-                        'BLOCK!',
-                        this.crouching ? '#00ffff' : '#0080ff', // Cyan for crouch block, blue for stand block
-                        36
-                    ));
+                    // Block effect removed
                     
                     // Show chip damage number
                     if (chipDamage > 0) {
@@ -3139,7 +3157,7 @@
                             y: this.y - 100,
                             life: 30,
                             type: 'chip',
-                            text: `-${Math.floor(chipDamage)}`,
+                            text: `-${chipDamage.toFixed(chipDamage < 1 ? 2 : 0)}`,
                             vy: -2,
                             update() {
                                 this.y += this.vy;
@@ -3364,34 +3382,7 @@
                 // Render character body
                 this.drawCharacterSprite();
                 
-                // Draw blocking indicator
-                if (this.blocking) {
-                    ctx.save();
-                    
-                    // Draw a shield effect
-                    ctx.strokeStyle = this.crouching ? '#00ffff' : '#0080ff';
-                    ctx.lineWidth = 4;
-                    ctx.globalAlpha = 0.6 + Math.sin(Date.now() * 0.005) * 0.2; // Pulsing effect
-                    
-                    // Draw shield arc in front of character
-                    ctx.beginPath();
-                    const shieldX = this.x + (this.facing * 30);
-                    const shieldY = this.y - 50;
-                    const shieldRadius = 60;
-                    const startAngle = this.facing === 1 ? -Math.PI * 0.7 : -Math.PI * 0.3;
-                    const endAngle = this.facing === 1 ? Math.PI * 0.7 : Math.PI * 1.3;
-                    ctx.arc(shieldX, shieldY, shieldRadius, startAngle, endAngle);
-                    ctx.stroke();
-                    
-                    // Add blocking text above character
-                    ctx.globalAlpha = 1;
-                    ctx.fillStyle = this.crouching ? '#00ffff' : '#0080ff';
-                    ctx.font = 'bold 16px monospace';
-                    ctx.textAlign = 'center';
-                    ctx.fillText(this.crouching ? 'LOW BLOCK' : 'HIGH BLOCK', this.x, this.y - 100);
-                    
-                    ctx.restore();
-                }
+                // Blocking visual removed
                 
                 // Render attacks based on character-specific layering
                 if (renderAttacks && this.state === 'attack' && this.currentMove) {
@@ -4502,7 +4493,8 @@
                                         proj.moveData.blockstun,
                                         proj.moveData.pushback,
                                         false,
-                                        projectileAttacker
+                                        projectileAttacker,
+                                        true  // This is a projectile
                                     );
                                     
                                     bill.hasHit = true;
@@ -4550,7 +4542,8 @@
                                 proj.moveData.blockstun,
                                 proj.moveData.pushback,
                                 false,
-                                projectileAttacker
+                                projectileAttacker,
+                                true  // This is a projectile
                             );
                             
                             // For flamethrower, don't destroy projectile, just add hit cooldown
