@@ -2555,15 +2555,9 @@
                     
                     if (!this.blocking || canWalkWhileBlocking) {
                         if (keys['a'] && !this.crouching) {
-                            // Only allow backward walk when blocking (walking away from opponent)
-                            if (!this.blocking || (this.blocking && this.facing === 1)) {
-                                this.walk(-1); // Always move left with A
-                            }
+                            this.walk(-1); // Always move left with A
                         } else if (keys['d'] && !this.crouching) {
-                            // Only allow backward walk when blocking (walking away from opponent)
-                            if (!this.blocking || (this.blocking && this.facing === -1)) {
-                                this.walk(1);  // Always move right with D
-                            }
+                            this.walk(1);  // Always move right with D
                         } else if (this.grounded && Math.abs(this.velocityX) < 0.5) {
                             this.state = this.crouching ? 'crouch' : 'idle';
                         }
