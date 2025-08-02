@@ -440,6 +440,7 @@
         let comboTimer = 0;
         let particles = [];
         let afterImages = [];
+        let ghostTrailManager = null; // Initialize after classes are defined
         
         // Testing toggle
         let aiAttackDisabled = false;  // Toggle for disabling AI attacks (press '1')
@@ -710,10 +711,10 @@
                         console.log('[DEBUG] AI attacks:', aiAttackDisabled ? 'DISABLED' : 'ENABLED');
                         
                         // Reset AI state when disabling attacks to prevent stuck states
-                        if (aiAttackDisabled && ai.fighter.state === 'attack') {
-                            ai.fighter.state = 'idle';
-                            ai.fighter.currentMove = null;
-                            ai.fighter.moveFrame = 0;
+                        if (aiAttackDisabled && aiPlayer && aiPlayer.state === 'attack') {
+                            aiPlayer.state = 'idle';
+                            aiPlayer.currentMove = null;
+                            aiPlayer.moveFrame = 0;
                         }
                     }
                     
@@ -747,6 +748,13 @@
                     if (key === '8') {
                         SPRITE_DEBUG_MODE = !SPRITE_DEBUG_MODE;
                         console.log('[SPRITES] Debug mode:', SPRITE_DEBUG_MODE ? 'ON' : 'OFF');
+                    }
+                    
+                    // Toggle ghost trails with 'G' key
+                    if (key === 'g') {
+                        if (ghostTrailManager) {
+                            ghostTrailManager.toggle();
+                        }
                     }
                     
                     e.preventDefault();
@@ -1241,6 +1249,169 @@
                 this.fighter.x = tempX;
                 this.fighter.y = tempY;
                 ctx.restore();
+            }
+        }
+
+        // Ghost Trail Manager
+        class GhostTrailManager {
+            constructor() {
+                this.enabled = false; // OFF by default
+                this.trails = [];
+                this.trailConfig = {
+                    // Configure which moves should create ghost trails
+                    shoryuken: { enabled: true, interval: 2, opacity: 0.9, fadeSpeed: 0.06 },
+                    tatsumaki: { enabled: true, interval: 3, opacity: 0.9, fadeSpeed: 0.05 },
+                    hadouken: { enabled: false }, // No trail for projectile moves
+                    dash: { enabled: true, interval: 2, opacity: 0.9, fadeSpeed: 0.08 },
+                    // Basic moves
+                    jumpKick: { enabled: true, interval: 3, opacity: 0.9, fadeSpeed: 0.07 },
+                    heavyPunch: { enabled: true, interval: 4, opacity: 0.9, fadeSpeed: 0.06 },
+                    // Standing kicks
+                    'K': { enabled: true, interval: 2, opacity: 0.9, fadeSpeed: 0.07 }
+                };
+                this.frameCounter = 0;
+            }
+
+            shouldCreateTrail(fighter) {
+                if (!this.enabled) return false;
+                
+                // Check if the current move should create a trail
+                if (fighter.currentMove && this.trailConfig[fighter.currentMove]?.enabled) {
+                    const config = this.trailConfig[fighter.currentMove];
+                    return this.frameCounter % config.interval === 0;
+                }
+                
+                // Check for standing kick (K move)
+                if (fighter.state === 'attack' && fighter.currentMove === 'K') {
+                    return this.frameCounter % 2 === 0;
+                }
+                
+                // Check for specific states that might create trails
+                if (fighter.state === 'jump') {
+                    // Check specifically for jumpKick move
+                    const isJumpKick = fighter.currentMove === 'jumpKick';
+                    
+                    // More frequent trails for jump kicks, less for regular jumps
+                    if (isJumpKick) {
+                        return this.frameCounter % 2 === 0;
+                    } else {
+                        // Regular jumps
+                        return this.frameCounter % 3 === 0;
+                    }
+                }
+                
+                return false;
+            }
+
+            addTrail(fighter) {
+                if (!this.shouldCreateTrail(fighter)) return;
+                
+                // Use specific config if available, otherwise use defaults based on state
+                let config = this.trailConfig[fighter.currentMove];
+                if (!config) {
+                    if (fighter.state === 'jump') {
+                        // Jump-specific defaults
+                        config = { opacity: 0.9, fadeSpeed: 0.05 };
+                    } else {
+                        // General defaults
+                        config = { opacity: 0.9, fadeSpeed: 0.06 };
+                    }
+                }
+                
+                this.trails.push({
+                    x: fighter.x,
+                    y: fighter.y,
+                    characterName: fighter.characterName,
+                    state: fighter.state,
+                    currentMove: fighter.currentMove,
+                    animFrame: fighter.animFrame,
+                    facing: fighter.facing,
+                    crouching: fighter.crouching,
+                    jumpFrame: fighter.jumpFrame,
+                    opacity: config.opacity,
+                    fadeSpeed: config.fadeSpeed,
+                    color: fighter.characterName === 'elon' ? '#00ff00' : '#ff0000' // Green for Elon, Red for Trump
+                });
+            }
+
+            update() {
+                this.frameCounter++;
+                
+                // Update existing trails
+                this.trails = this.trails.filter(trail => {
+                    trail.opacity -= trail.fadeSpeed;
+                    return trail.opacity > 0;
+                });
+            }
+
+            draw(ctx, fighters) {
+                if (!this.enabled) return;
+                
+                // Draw trails from oldest to newest
+                this.trails.forEach(trail => {
+                    // Find the correct fighter for this trail
+                    const correctFighter = Array.isArray(fighters) 
+                        ? fighters.find(f => f.characterName === trail.characterName)
+                        : (fighters.characterName === trail.characterName ? fighters : null);
+                    
+                    if (!correctFighter) return;
+                    
+                    ctx.save();
+                    ctx.globalAlpha = trail.opacity * 0.85; // Increased visibility
+                    
+                    // Store original fighter state
+                    const originalState = {
+                        x: correctFighter.x,
+                        y: correctFighter.y,
+                        state: correctFighter.state,
+                        currentMove: correctFighter.currentMove,
+                        animFrame: correctFighter.animFrame,
+                        facing: correctFighter.facing,
+                        crouching: correctFighter.crouching,
+                        jumpFrame: correctFighter.jumpFrame
+                    };
+                    
+                    // Temporarily modify fighter to draw at trail position
+                    correctFighter.x = trail.x;
+                    correctFighter.y = trail.y;
+                    correctFighter.state = trail.state;
+                    correctFighter.currentMove = trail.currentMove;
+                    correctFighter.animFrame = trail.animFrame;
+                    correctFighter.facing = trail.facing;
+                    correctFighter.crouching = trail.crouching;
+                    correctFighter.jumpFrame = trail.jumpFrame;
+                    
+                    // Draw the ghost sprite with color tint
+                    ctx.globalCompositeOperation = 'screen';
+                    correctFighter.drawCharacterSprite(true); // Draw as afterimage
+                    
+                    // Add subtle color overlay
+                    ctx.globalCompositeOperation = 'multiply';
+                    ctx.fillStyle = trail.color;
+                    ctx.globalAlpha = trail.opacity * 0.15;
+                    
+                    // Simple colored rectangle over the sprite area
+                    const width = 150;
+                    const height = 300;
+                    ctx.fillRect(trail.x - width/2, trail.y - height, width, height);
+                    
+                    // Restore original fighter state
+                    Object.assign(correctFighter, originalState);
+                    
+                    ctx.restore();
+                });
+            }
+
+            toggle() {
+                this.enabled = !this.enabled;
+                if (!this.enabled) {
+                    this.trails = []; // Clear all trails when disabled
+                }
+                console.log('[GHOST TRAILS]', this.enabled ? 'ENABLED' : 'DISABLED');
+            }
+
+            setMoveConfig(moveName, config) {
+                this.trailConfig[moveName] = { ...this.trailConfig[moveName], ...config };
             }
         }
 
@@ -3734,8 +3905,8 @@
                             'K': 'kick-standing',
                             'crP': 'crouch-punch',
                             'crK': 'crouch-kick',
-                            'jP': 'jumppunch-elon',
-                            'jK': 'jump-kick',
+                            'jP': 'jP',  // Let sprite manager handle character-specific mapping
+                            'jK': 'jK',  // Let sprite manager handle character-specific mapping
                             'hadouken': 'hadouken',  // Maps to powermove-1.png for Elon
                             'shoryuken': 'punch',    // Use punch sprite for shoryuken
                             'tatsumaki': 'kick-standing',  // Use kick sprite for tatsumaki
@@ -4589,6 +4760,9 @@
         const aiPlayer = new Fighter(710, false, 'trump');
         const aiController = new AIController(aiPlayer);
         
+        // Initialize ghost trail manager
+        ghostTrailManager = new GhostTrailManager();
+        
         // Set player reference for gamepad special moves
         inputManager.setPlayer(player);
         
@@ -4983,6 +5157,13 @@
                 aiController.update(player);
                 aiPlayer.update();
                 
+                // Update ghost trails
+                if (ghostTrailManager) {
+                    ghostTrailManager.update();
+                    ghostTrailManager.addTrail(player);
+                    ghostTrailManager.addTrail(aiPlayer);
+                }
+                
                 checkCollisions();
                 
                 // Update combo counter
@@ -5094,6 +5275,11 @@
             
             // Draw shadows first (so they appear under fighters)
             drawOrder.forEach(fighter => fighter.drawShadow());
+            
+            // Draw ghost trails before fighters
+            if (ghostTrailManager) {
+                ghostTrailManager.draw(ctx, [player, aiPlayer]);
+            }
             
             // Draw fighters in determined order
             drawOrder.forEach(fighter => fighter.draw(true));
