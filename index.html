@@ -1264,7 +1264,8 @@
                     hadouken: { enabled: false }, // No trail for projectile moves
                     dash: { enabled: true, interval: 2, opacity: 0.9, fadeSpeed: 0.08 },
                     // Basic moves
-                    jumpKick: { enabled: true, interval: 3, opacity: 0.9, fadeSpeed: 0.07 },
+                    'jK': { enabled: true, interval: 2, opacity: 0.9, fadeSpeed: 0.07 }, // Jump kick
+                    'jP': { enabled: true, interval: 3, opacity: 0.9, fadeSpeed: 0.07 }, // Jump punch
                     heavyPunch: { enabled: true, interval: 4, opacity: 0.9, fadeSpeed: 0.06 },
                     // Standing kicks
                     'K': { enabled: true, interval: 2, opacity: 0.9, fadeSpeed: 0.07 }
@@ -1286,18 +1287,10 @@
                     return this.frameCounter % 2 === 0;
                 }
                 
-                // Check for specific states that might create trails
-                if (fighter.state === 'jump') {
-                    // Check specifically for jumpKick move
-                    const isJumpKick = fighter.currentMove === 'jumpKick';
-                    
-                    // More frequent trails for jump kicks, less for regular jumps
-                    if (isJumpKick) {
-                        return this.frameCounter % 2 === 0;
-                    } else {
-                        // Regular jumps
-                        return this.frameCounter % 3 === 0;
-                    }
+                // Check for jump state (without a specific move) for regular jumps
+                if (fighter.state === 'jump' && !fighter.currentMove) {
+                    // Regular jumps (less frequent trails)
+                    return this.frameCounter % 4 === 0;
                 }
                 
                 return false;

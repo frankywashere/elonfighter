@@ -64,7 +64,20 @@ This is a Street Fighter II-style fighting game featuring Elon Musk and Donald T
 
 ## Recent Changes
 
-### Walk Cycle and Mobile Button Fix (2025-08-02 - Latest)
+### Ghost Trail System (2025-08-02 - Latest)
+- **Ghost Trail Manager**: Implemented visual trail effects for special moves
+  - Disabled by default, toggle with 'G' key
+  - Per-move configuration (shoryuken, tatsumaki, dash, etc.)
+  - Color-coded trails: Green for Elon, Red for Trump
+  - Configurable opacity, fade speed, and interval per move
+  - Only activates during specific moves or high-speed movements
+- **Technical Implementation**:
+  - `GhostTrailManager` class manages trail creation and rendering
+  - Stores fighter state snapshots (position, sprite, animation frame)
+  - Uses screen blend mode for ethereal effect
+  - Integrated into game loop for automatic updates
+
+### Walk Cycle and Mobile Button Fix (2025-08-02)
 - **Elon Walk Cycle Update**: Changed from 3-frame cycle (0-1-2) to 4-step cycle (0-1-2-1-0)
   - Creates smoother walking animation with return motion
   - Uses frames: walking1.png → walking2.png → walking3.png → walking2.png → repeat
@@ -126,6 +139,20 @@ This is a Street Fighter II-style fighting game featuring Elon Musk and Donald T
 - Screen shake on heavy hits
 - Global hit pause for impact feel
 - Particle effects using Canvas 2D API
+- Ghost trails: Visual afterimage effects for special moves
+
+### Ghost Trail System
+- **GhostTrailManager**: Controls afterimage effects
+  - Default state: Disabled (toggle with 'G' key)
+  - Per-move configuration in `trailConfig` object
+  - Properties per move: enabled, interval, opacity, fadeSpeed
+  - Color coding: Green trails for Elon, red for Trump
+- **Supported Moves**:
+  - Shoryuken: High opacity, slow fade
+  - Tatsumaki: Medium opacity, moderate fade
+  - Dash movements: Lower opacity, fast fade
+  - Jump kicks and heavy punches: Configurable per move
+- **Rendering**: Uses screen blend mode with character sprites
 
 ### Frame Data Structure
 Each move has:
@@ -171,6 +198,7 @@ elon game test/
 - Mobile restart button appears after game over
 - Throw animations no longer rotate the thrown character
 - Blocking logic has been fixed to prevent movement lock
+- Ghost trail system is implemented but disabled by default (press 'G' to toggle)
 
 ## Update Checklist
 When making changes, update:
@@ -181,4 +209,4 @@ When making changes, update:
 5. Git repository info if branches/remotes change
 
 ---
-Last Updated: 2025-08-02 (Walk cycle & mobile button fixes)
+Last Updated: 2025-08-02 (Ghost trail system & walk cycle fixes)
