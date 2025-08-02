@@ -1,5 +1,8 @@
 # Elon Fighter Game - Project Documentation
 
+## IMPORTANT: Keep This File Updated!
+**This file must be updated whenever ANY changes are made to the game. This ensures future sessions have accurate information about the project state.**
+
 ## Overview
 This is a Street Fighter II-style fighting game featuring Elon Musk and Donald Trump as playable characters. The game is built using HTML5 Canvas and vanilla JavaScript.
 
@@ -17,6 +20,7 @@ This is a Street Fighter II-style fighting game featuring Elon Musk and Donald T
   - **Flamethrower** (↓↘→ + Punch) - Uses `powermove-1.png` sprite, shoots flame particles
   - **Shoryuken** (→↓↘ + Punch) - Rising uppercut with invincibility frames  
   - **Tatsumaki** (↓↙← + Kick) - Spinning kick
+  - **Throw** (I+K when close) - Uses `throw.png` sprite (scaled down 20% with scale_throw_sprite.py)
 
 ### Trump (CPU/Player 2)
 - Sprite folder: `trump1_normalized_v3/`
@@ -60,7 +64,32 @@ This is a Street Fighter II-style fighting game featuring Elon Musk and Donald T
 
 ## Recent Changes
 
-### Character-Specific Projectiles (Latest)
+### Mobile Restart Button (2025-08-02)
+- Added restart button for mobile devices that appears after game over
+- CSS styling with red background and retro game aesthetic
+- Shows only on mobile devices when game ends
+- Reloads page on click to start new game
+
+### Throw Animation Fixes (2025-08-02)
+1. **Throw Sprite Added**:
+   - Added `throw.png` sprite for Elon's throw animation
+   - Scaled down 20% using `scale_throw_sprite.py` for better proportions
+   - Backup created as `throw_backup.png`
+2. **Rotation Removed**:
+   - Removed rotation animation when characters are thrown
+   - Characters now stay upright during throw animation
+   - Cleaner visual appearance
+
+### Blocking Bug Fixes (2025-08-02)
+1. **Movement Restriction Fix**:
+   - Fixed bug where player could get stuck unable to move backwards
+   - Removed overly restrictive `veryClose` condition in blocking logic
+   - Improved blocking to only activate during actual threats
+2. **AI Toggle Fix**:
+   - Added proper state reset when toggling AI with '1' key
+   - Prevents AI from getting stuck in attack state
+
+### Character-Specific Projectiles
 1. **Elon's Flamethrower**:
    - Added `powermove-1.png` sprite showing "NOT-A-FLAMETHROWER"
    - Created `FlameParticle` class for flame effects
@@ -102,8 +131,9 @@ Sprites are loaded via `SpriteManager` class with mappings defined in `spriteMap
 
 ## Git Repository
 - Local repo: `/Users/frank/Desktop/elon game test/`
-- NOT currently tracked in git (no .git folder)
-- No GitHub remote set up yet
+- GitHub remote: `https://github.com/frankywashere/elonfighter.git`
+- Main branch: `main`
+- Other branches: `gh-pages`, `webgl-motion-blur`
 
 ## Project Structure
 ```
@@ -111,22 +141,35 @@ elon game test/
 ├── index.html (main game)
 ├── fighter.html (old version - can be removed)
 ├── normalize_sprites_v3.py (sprite processor)
+├── scale_throw_sprite.py (utility to scale throw sprite)
 ├── elon/
 │   ├── Elon1/ (original sprites)
 │   └── Elon1_normalized_v3/ (processed sprites)
 ├── trump1/
 │   └── trump1_normalized_v3/ (processed sprites)
-└── CLAUDE.md (this file)
+└── CLAUDE.md (this file - MUST BE KEPT UPDATED!)
 ```
 
 ## Notes for Future Sessions
+- **ALWAYS UPDATE THIS FILE** when making changes to the game
 - The main game file is now index.html (renamed from fighter_enhanced.html)
 - Run sprite normalization after adding new sprites
 - Check sprite mappings in HTML when adding new animations
 - Flamethrower uses multi-hit collision with cooldown between hits
 - Trump's money throw uses MoneyBill particles with physics simulation
 - Text effects are implemented via TextEffect class for special moves
-- Mobile controls are implemented but may need testing
+- Mobile controls are implemented with virtual joystick and action buttons
+- Mobile restart button appears after game over
+- Throw animations no longer rotate the thrown character
+- Blocking logic has been fixed to prevent movement lock
+
+## Update Checklist
+When making changes, update:
+1. Recent Changes section with date and description
+2. Character moves if new moves added
+3. Project structure if files added/removed
+4. Technical details if systems changed
+5. Git repository info if branches/remotes change
 
 ---
-Last Updated: 2025-08-01
+Last Updated: 2025-08-02
