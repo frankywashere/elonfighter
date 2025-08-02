@@ -837,6 +837,10 @@
                 
                 // Regular button handling
                 const handleTouchStart = (e) => {
+                    // Allow restart button clicks
+                    if (e.target.classList.contains('restart-btn')) {
+                        return;
+                    }
                     e.preventDefault();
                     const button = e.target;
                     if (button.dataset.key) {
@@ -1435,16 +1439,19 @@
                     } else if (this.state === 'walk') {
                         // Animated walk cycle
                         if (this.characterName === 'elon') {
-                            // 3-frame walk cycle for Elon
-                            const walkCycleFrame = Math.floor(this.animTimer / 6) % 3;
+                            // 4-step walk cycle for Elon: 0-1-2-1-0
+                            // Increased frame duration to 20 for much slower transitions
+                            const walkCycleFrame = Math.floor(this.animTimer / 20) % 4;
                             
-                            // Cycle through walk -> walk2 -> walk3
+                            // Cycle through walk -> walk2 -> walk3 -> walk2 -> walk (repeat)
                             if (walkCycleFrame === 0) {
                                 spriteState = 'walk';  // walking1.png
                             } else if (walkCycleFrame === 1) {
                                 spriteState = 'walk2'; // walking2.png
-                            } else {
+                            } else if (walkCycleFrame === 2) {
                                 spriteState = 'walk3'; // walking3.png
+                            } else {
+                                spriteState = 'walk2'; // walking2.png (return)
                             }
                             
                             // Add a slight vertical bob for more natural movement

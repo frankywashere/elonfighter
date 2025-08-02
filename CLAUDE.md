@@ -64,6 +64,15 @@ This is a Street Fighter II-style fighting game featuring Elon Musk and Donald T
 
 ## Recent Changes
 
+### Walk Cycle and Mobile Button Fix (2025-08-02 - Latest)
+- **Elon Walk Cycle Update**: Changed from 3-frame cycle (0-1-2) to 4-step cycle (0-1-2-1-0)
+  - Creates smoother walking animation with return motion
+  - Uses frames: walking1.png → walking2.png → walking3.png → walking2.png → repeat
+  - **Frame Duration**: Increased from 6 to 20 frames per step for much slower transitions
+- **Mobile Restart Button Fix**: Fixed click event being blocked by preventDefault
+  - Added exception for restart button in touch event handler
+  - Button now properly reloads page when clicked
+
 ### Mobile Restart Button (2025-08-02)
 - Added restart button for mobile devices that appears after game over
 - CSS styling with red background and retro game aesthetic
@@ -172,4 +181,4 @@ When making changes, update:
 5. Git repository info if branches/remotes change
 
 ---
-Last Updated: 2025-08-02
+Last Updated: 2025-08-02 (Walk cycle & mobile button fixes)
